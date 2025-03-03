@@ -272,11 +272,6 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-      {/* Floating Design Elements */}
-      <div className="absolute top-24 left-12 w-24 h-24 bg-black dark:bg-white opacity-[0.07] rounded-lg animate-float"></div>
-      <div className="absolute bottom-24 right-12 w-24 h-24 bg-black dark:bg-white opacity-[0.07] rounded-full animate-pulse"></div>
-      <div className="absolute top-12 right-24 w-24 h-24 bg-black dark:bg-white opacity-[0.07] rounded-lg animate-float-reverse"></div>
-      <div className="absolute bottom-12 left-24 w-24 h-24 bg-black dark:bg-white opacity-[0.07] rounded-full animate-pulse-reverse"></div>
 
       {/* Dark Mode Toggle */}
       <button 

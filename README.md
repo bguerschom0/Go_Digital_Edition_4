@@ -1,2 +1,1 @@
-# VMS
-Visitor Management System
+# Go Digital Edition 4

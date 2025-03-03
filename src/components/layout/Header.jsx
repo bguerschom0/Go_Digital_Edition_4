@@ -3,9 +3,10 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Moon, Sun, ChevronDown, User, LogOut, Menu, X, UserCircle } from 'lucide-react';
 import { roleBasedNavigation } from './navigationConfig';
-import {  Dialog,  DialogContent,  DialogHeader,  DialogTitle,} from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { getRoleBasedDashboard } from '../../utils/roleRoutes';
+import NotificationBell from '../notifications/NotificationBell';
 
 const Header = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -59,13 +60,13 @@ const Header = () => {
     setIsMobileMenuOpen(false);
   };
 
-const handleLogoClick = () => {
-  if (user) {
-    const dashboardPath = getRoleBasedDashboard(user.role);
-    navigate(dashboardPath);
-  }
-  setIsMobileMenuOpen(false);
-};
+  const handleLogoClick = () => {
+    if (user) {
+      const dashboardPath = getRoleBasedDashboard(user.role);
+      navigate(dashboardPath);
+    }
+    setIsMobileMenuOpen(false);
+  };
 
   useEffect(() => {
     localStorage.setItem('darkMode', isDarkMode);
@@ -109,7 +110,7 @@ const handleLogoClick = () => {
         <div className="max-w-full px-4 py-2">
           <div className="flex justify-between items-center">
             <img 
-              src="logo.png" 
+              src="/logo.png" 
               alt="Logo" 
               className="h-10 w-auto cursor-pointer" 
               onClick={handleLogoClick}
@@ -181,64 +182,68 @@ const handleLogoClick = () => {
               </nav>
             </div>
 
-            {/* Desktop User Menu */}
+            {/* Desktop User Menu and Notifications */}
             {user && (
-              <div className="hidden md:block relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center space-x-3 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2"
-                >
-                  <div className="bg-gray-300 dark:bg-gray-600 rounded-full p-2">
-                    <User className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {user.fullName}
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                </button>
+              <div className="hidden md:flex items-center space-x-4">
+                <NotificationBell />
+                
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="flex items-center space-x-3 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2"
+                  >
+                    <div className="bg-gray-300 dark:bg-gray-600 rounded-full p-2">
+                      <User className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {user.full_name}
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  </button>
 
-                {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 z-10 border border-gray-200 dark:border-gray-700">
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-gray-300 dark:bg-gray-600 rounded-full p-3">
-                          <User className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.full_name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{user.username}</p>
+                  {isDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 z-10 border border-gray-200 dark:border-gray-700">
+                      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-gray-300 dark:bg-gray-600 rounded-full p-3">
+                            <User className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.full_name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{user.username}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                      <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                        <button
+                          onClick={handleProfileClick}
+                          className="flex items-center w-full text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md px-2 py-2"
+                        >
+                          <User className="h-4 w-4 mr-2" />
+                          My Profile
+                        </button>
+                        <button
+                          onClick={toggleDarkMode}
+                          className="flex items-center w-full text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md px-2 py-2"
+                        >
+                          {isDarkMode ? (
+                            <Sun className="h-4 w-4 mr-2" />
+                          ) : (
+                            <Moon className="h-4 w-4 mr-2" />
+                          )}
+                          {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                        </button>
+                      </div>
                       <button
-                        onClick={handleProfileClick}
-                        className="flex items-center w-full text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md px-2 py-2"
+                        onClick={handleSignOut}
+                        className="flex items-center w-full text-left px-6 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
                       >
-                        <User className="h-4 w-4 mr-2" />
-                        My Profile
-                      </button>
-                      <button
-                        onClick={toggleDarkMode}
-                        className="flex items-center w-full text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md px-2 py-2"
-                      >
-                        {isDarkMode ? (
-                          <Sun className="h-4 w-4 mr-2" />
-                        ) : (
-                          <Moon className="h-4 w-4 mr-2" />
-                        )}
-                        {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
                       </button>
                     </div>
-                    <button
-                      onClick={handleSignOut}
-                      className="flex items-center w-full text-left px-6 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -257,7 +262,7 @@ const handleLogoClick = () => {
                     <User className="h-6 w-6 text-gray-600 dark:text-gray-300" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user?.fullName}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user?.full_name}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{user?.username}</p>
                   </div>
                 </div>
@@ -315,6 +320,19 @@ const handleLogoClick = () => {
               </nav>
 
               <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="mb-2">
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      navigate('/notifications');
+                    }}
+                    className="flex items-center w-full px-3 py-2 rounded-md text-sm text-gray-900 
+                             dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    <NotificationBell isMobile={true} />
+                    <span className="ml-2">Notifications</span>
+                  </button>
+                </div>
                 <button
                   onClick={handleProfileClick}
                   className="flex items-center w-full px-3 py-2 rounded-md text-sm text-gray-900 
@@ -350,69 +368,66 @@ const handleLogoClick = () => {
       )}
 
       {/* Profile Modal */}
-<Dialog open={isProfileModalOpen} onOpenChange={setIsProfileModalOpen}>
-  <DialogContent className="sm:max-w-[400px] p-0 gap-0">
-    <div className="flex flex-col">
-      {/* Profile Header with Avatar */}
-      <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-t-lg">
-        <div className="flex flex-col items-center">
-          <div className="bg-white dark:bg-gray-700 rounded-full p-4 shadow-sm">
-            <UserCircle className="h-20 w-20 text-gray-400 dark:text-gray-300" />
+      <Dialog open={isProfileModalOpen} onOpenChange={setIsProfileModalOpen}>
+        <DialogContent className="sm:max-w-[400px] p-0 gap-0">
+          <div className="flex flex-col">
+            {/* Profile Header with Avatar */}
+            <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-t-lg">
+              <div className="flex flex-col items-center">
+                <div className="bg-white dark:bg-gray-700 rounded-full p-4 shadow-sm">
+                  <UserCircle className="h-20 w-20 text-gray-400 dark:text-gray-300" />
+                </div>
+              </div>
+            </div>
+
+            {/* Profile Information */}
+            <div className="p-6 space-y-4">
+              {/* Full Name */}
+              <div className="text-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  {user?.full_name}
+                </h2>
+              </div>
+
+              {/* Info Grid */}
+              <div className="space-y-3">
+                {/* Username */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Username</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {user?.username}
+                  </span>
+                </div>
+
+                {/* Role */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Role</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {user?.role}
+                  </span>
+                </div>
+
+                {/* Status */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Status</span>
+                  <div className="flex items-center">
+                    <div className={`h-2 w-2 rounded-full ${
+                      Boolean(user?.is_active) === false ? 'bg-red-500' : 'bg-green-500'
+                    } mr-2`} />
+                    <span className={`text-sm font-medium ${
+                      Boolean(user?.is_active) === false
+                        ? 'text-red-600 dark:text-red-400' 
+                        : 'text-green-600 dark:text-green-400'
+                    }`}>
+                      {Boolean(user?.is_active) === false ? 'Inactive' : 'Active'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Profile Information */}
-      <div className="p-6 space-y-4">
-        {/* Full Name */}
-        <div className="text-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {user?.full_name}
-          </h2>
-        </div>
-
-        {/* Info Grid */}
-        <div className="space-y-3">
-          {/* Username */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Username</span>
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {user?.username}
-            </span>
-          </div>
-
-          {/* Role */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Role</span>
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {user?.role}
-            </span>
-          </div>
-
-          {/* Status */}
-<div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-  <span className="text-sm text-gray-500 dark:text-gray-400">Status</span>
-  <div className="flex items-center">
-    {/* Adding console log to debug */}
-    {console.log('is_active value:', user?.is_active, 'type:', typeof user?.is_active)}
-    
-    <div className={`h-2 w-2 rounded-full ${
-      Boolean(user?.is_active) === false ? 'bg-red-500' : 'bg-green-500'
-    } mr-2`} />
-    <span className={`text-sm font-medium ${
-      Boolean(user?.is_active) === false
-        ? 'text-red-600 dark:text-red-400' 
-        : 'text-green-600 dark:text-green-400'
-    }`}>
-      {Boolean(user?.is_active) === false ? 'Inactive' : 'Active'}
-    </span>
-  </div>
-</div>
-        </div>
-      </div>
-    </div>
-  </DialogContent>
-</Dialog>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

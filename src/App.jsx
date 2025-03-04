@@ -70,7 +70,7 @@ const App = () => {
       
       {/* User Management routes - only for admins */}
       <Route path="/user-management" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><UserManagement /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/role-management" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><RoleManagement /></AuthenticatedLayout></ProtectedRoute>} />
+
 
       {/* Request routes - accessible by all authenticated users */}
       <Route path="/requests" element={<ProtectedRoute><AuthenticatedLayout><RequestList /></AuthenticatedLayout></ProtectedRoute>} />

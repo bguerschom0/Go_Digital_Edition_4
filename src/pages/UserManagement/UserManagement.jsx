@@ -45,7 +45,7 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
   }, [user]);
 
   const roles = [
-    { value: 'administrator', label: 'Administrator' },
+    { value: 'admin', label: 'Admin' },
     { value: 'user', label: 'User' },
     { value: 'organization', label: 'Organization' }
   ];
@@ -261,7 +261,7 @@ const UserManagement = () => {
 
   // Available roles (simplified to 3 roles)
   const roles = [
-    { value: 'administrator', label: 'Administrator' },
+    { value: 'admin', label: 'Admin' },
     { value: 'user', label: 'User' },
     { value: 'organization', label: 'Organization' }
   ];
@@ -448,8 +448,8 @@ const UserManagement = () => {
   // Get display role text
   const getDisplayRole = (role) => {
     switch(role) {
-      case 'administrator':
-        return 'Administrator';
+      case 'admin':
+        return 'Admin';
       case 'organization':
         return 'Organization';
       case 'user':

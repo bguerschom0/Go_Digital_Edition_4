@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const roleBasedNavigation = {
-  admin: [
+  administrator: [
     {
       name: 'Dashboard',
       path: '/admindashboard',

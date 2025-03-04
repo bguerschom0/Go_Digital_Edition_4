@@ -1,147 +1,189 @@
-import { useState, useEffect, createContext, useContext } from 'react';
-import { supabase } from '../config/supabase';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 
-const AuthContext = createContext();
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
+  
   const [loading, setLoading] = useState(true);
+  const logoutTimer = useRef(null);
 
   useEffect(() => {
-    // Check for existing user on mount
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    
-    setLoading(false);
-    
-    // Subscribe to auth changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          localStorage.removeItem('user');
-        }
+      const parsedUser = JSON.parse(storedUser);
+      // Check if user is active
+      if (parsedUser.is_active) {
+        setUser(parsedUser);
+        resetLogoutTimer();
+      } else {
+        // Clear user if account is not active
+        logout();
       }
-    );
-    
-    return () => {
-      authListener?.unsubscribe();
-    };
+    }
+    setLoading(false);
   }, []);
 
-  // Login function
+  const resetLogoutTimer = () => {
+    clearTimeout(logoutTimer.current);
+    logoutTimer.current = setTimeout(() => {
+      logout();
+    }, 5 * 60 * 1000); // 5 minutes of inactivity
+  };
+
   const login = async (username, password) => {
     try {
-      // Find user by username
+      // First check user exists
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
         .eq('username', username)
         .single();
-      
-      if (userError) throw userError;
-      
-      if (!userData) {
-        return { error: 'Invalid username or password' };
-      }
-      
-      // Check if account is active
+
+      if (userError) throw new Error('Invalid credentials');
+
+      // Check user active status
       if (!userData.is_active) {
-        return { accountInactive: true };
+        return { 
+          user: null, 
+          error: 'Account is not active. Please contact the administrator.',
+          accountInactive: true
+        };
       }
-      
-      // Verify password (this should be done with bcrypt in a secure environment)
-      // For demo purposes, we'll simulate password verification
-      const isPasswordValid = userData.password === password || 
-                            (userData.temp_password === password && 
-                             new Date(userData.temp_password_expires) > new Date());
-      
-      if (!isPasswordValid) {
-        return { error: 'Invalid username or password' };
+
+      // First check if there's a valid temporary password
+      if (userData?.temp_password) {
+        const tempPasswordValid = 
+          userData.temp_password === password && 
+          new Date(userData.temp_password_expires) > new Date();
+
+        if (tempPasswordValid) {
+          return { 
+            user: userData, 
+            error: null, 
+            passwordChangeRequired: true
+          };
+        }
       }
-      
-      // Check if password change is required
-      if (userData.password_change_required) {
-        return { passwordChangeRequired: true, user: userData };
+
+      // If no valid temp password, check regular password
+      if (!userData.password) {
+        throw new Error('Invalid credentials');
       }
-      
-      // Update last login time
-      await supabase
-        .from('users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('id', userData.id);
-      
-      // IMPORTANT: Set role based on User_Role_V4 if available, otherwise use legacy role
-      const userWithProcessedRole = {
-        ...userData,
-        // Use User_Role_V4 if available, otherwise map legacy role to one of the three new roles
-        role: userData.User_Role_V4 || mapLegacyRole(userData.role)
-      };
-      
-      // Store user in state and localStorage
-      setUser(userWithProcessedRole);
-      localStorage.setItem('user', JSON.stringify(userWithProcessedRole));
-      
-      return { user: userWithProcessedRole };
-    } catch (error) {
-      console.error('Login error:', error);
-      return { error: 'An unexpected error occurred' };
-    }
-  };
 
-  // Mapping from legacy roles to new roles
-  const mapLegacyRole = (legacyRole) => {
-    switch(legacyRole?.toLowerCase()) {
-      case 'admin':
-        return 'administrator';
-      case 'processor':
-      case 'supervisor':
-      case 'user':
-        return 'user';
-      case 'organization':
-        return 'organization';
-      default:
-        return 'user'; // Default role
-    }
-  };
+      const isValidPassword = await bcrypt.compare(password, userData.password);
 
-  // Logout function
-  const logout = async () => {
-    try {
-      setUser(null);
-      localStorage.removeItem('user');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
+      if (!isValidPassword) {
+        throw new Error('Invalid credentials');
+      }
 
-  // Update password
-  const updatePassword = async (userId, newPassword) => {
-    try {
-      const { error } = await supabase
+      // Update last login
+      const { error: updateError } = await supabase
         .from('users')
         .update({ 
-          password: newPassword,
+          last_login: new Date().toISOString() 
+        })
+        .eq('id', userData.id);
+
+      if (updateError) console.error('Error updating last login:', updateError);
+
+      return { 
+        user: userData, 
+        error: null, 
+        passwordChangeRequired: false
+      };
+    } catch (error) {
+      console.error('Login error:', error.message);
+      return { user: null, error: error.message };
+    }
+  };
+
+  const updatePassword = async (userId, newPassword) => {
+    try {
+      // Hash the new password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          password: hashedPassword,
           temp_password: null,
           temp_password_expires: null,
           password_change_required: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);
-      
-      if (error) throw error;
-      
-      return { success: true };
+
+      if (updateError) throw updateError;
+
+      // Fetch updated user information
+      const { data: updatedUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Update user in state and localStorage
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      resetLogoutTimer();
+
+      return { error: null };
     } catch (error) {
-      console.error('Update password error:', error);
+      console.error('Password update error:', error);
       return { error: error.message };
     }
   };
 
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    clearTimeout(logoutTimer.current);
+  };
+
+  // Reset logout timer on user activity
+  useEffect(() => {
+    const resetTimerOnActivity = () => {
+      if (user && user.is_active) {
+        resetLogoutTimer();
+      }
+    };
+    
+    window.addEventListener('mousemove', resetTimerOnActivity);
+    window.addEventListener('keydown', resetTimerOnActivity);
+    window.addEventListener('click', resetTimerOnActivity);
+    window.addEventListener('scroll', resetTimerOnActivity);
+
+    return () => {
+      window.removeEventListener('mousemove', resetTimerOnActivity);
+      window.removeEventListener('keydown', resetTimerOnActivity);
+      window.removeEventListener('click', resetTimerOnActivity);
+      window.removeEventListener('scroll', resetTimerOnActivity);
+    };
+  }, [user]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, setUser, updatePassword }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      setUser, 
+      loading, 
+      login, 
+      logout, 
+      updatePassword 
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -149,7 +191,7 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (context === null) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;

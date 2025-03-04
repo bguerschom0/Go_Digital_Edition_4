@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { 
   Search,
   UserCog,
-  Shield,
   CheckCircle,
   AlertCircle,
   Loader2
@@ -24,7 +23,7 @@ const RoleManagement = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
 
-  // Available roles (simplified to 3 roles)
+  // Only the three available roles
   const roles = [
     { value: 'administrator', label: 'Administrator' },
     { value: 'user', label: 'User' },
@@ -49,7 +48,7 @@ const RoleManagement = () => {
         query = query.eq('is_active', isActive);
       }
       
-      // Apply role filter
+      // Apply role filter using User_Role_V4
       if (roleFilter !== 'all') {
         query = query.eq('User_Role_V4', roleFilter);
       }
@@ -76,14 +75,10 @@ const RoleManagement = () => {
     try {
       setSavingRole(true);
       
-      // Update both role columns for backward compatibility
-      const legacyRole = newRole === 'administrator' ? 'admin' : newRole;
-      
       const { error } = await supabase
         .from('users')
         .update({
-          role: legacyRole,
-          User_Role_V4: newRole,
+          User_Role_V4: newRole,  // Update the new role column
           updated_by: currentUser.username,
           updated_at: new Date().toISOString()
         })
@@ -94,7 +89,7 @@ const RoleManagement = () => {
       // Update local state
       setUsers(prev => 
         prev.map(user => 
-          user.id === userId ? { ...user, User_Role_V4: newRole, role: legacyRole } : user
+          user.id === userId ? { ...user, User_Role_V4: newRole } : user
         )
       );
       
@@ -138,24 +133,22 @@ const RoleManagement = () => {
   const currentItems = users.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(users.length / itemsPerPage);
 
+  // Get display role from User_Role_V4
+  const getUserRole = (user) => {
+    return user.User_Role_V4 || 'user'; // Default to 'user' if not set
+  };
+
   // Get display role text
-  const getDisplayRole = (user) => {
-    // Prefer User_Role_V4 if available, otherwise use role
-    const roleValue = user.User_Role_V4 || user.role;
-    
-    // Format the role for display
-    switch(roleValue) {
+  const getDisplayRole = (role) => {
+    switch(role) {
       case 'administrator':
-      case 'admin':
         return 'Administrator';
       case 'organization':
         return 'Organization';
       case 'user':
-      case 'processor':
-      case 'supervisor':
         return 'User';
       default:
-        return roleValue.charAt(0).toUpperCase() + roleValue.slice(1);
+        return 'User'; // Default fallback
     }
   };
 
@@ -296,7 +289,7 @@ const RoleManagement = () => {
                           <span 
                             className="px-3 py-1.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
                           >
-                            {getDisplayRole(user)}
+                            {getDisplayRole(getUserRole(user))}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -449,7 +442,7 @@ const RoleManagement = () => {
                 <div className="flex items-center space-x-2 mb-4">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Current Role:</span>
                   <span className="px-2.5 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                    {getDisplayRole(selectedUser)}
+                    {getDisplayRole(getUserRole(selectedUser))}
                   </span>
                 </div>
                 
@@ -457,7 +450,7 @@ const RoleManagement = () => {
                   New Role:
                 </label>
                 <select
-                  value={selectedUser.User_Role_V4 || (selectedUser.role === 'admin' ? 'administrator' : selectedUser.role)}
+                  value={selectedUser.User_Role_V4 || 'user'} // Default to user if not set
                   onChange={(e) => setSelectedUser({...selectedUser, User_Role_V4: e.target.value})}
                   className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
                            bg-white dark:bg-gray-900 text-gray-900 dark:text-white
@@ -481,7 +474,7 @@ const RoleManagement = () => {
                 Cancel
               </button>
               <button
-                onClick={() => handleRoleChange(selectedUser.id, selectedUser.User_Role_V4 || selectedUser.role)}
+                onClick={() => handleRoleChange(selectedUser.id, selectedUser.User_Role_V4 || 'user')}
                 disabled={savingRole}
                 className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
                          hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors

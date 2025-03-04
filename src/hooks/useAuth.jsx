@@ -1,23 +1,21 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useState, useEffect, createContext, useContext, useRef } from 'react';
+import { supabase } from '../config/supabase';
 import bcrypt from 'bcryptjs';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+// Create auth context
+const AuthContext = createContext();
 
-const AuthContext = createContext(null);
-
+// Auth Provider component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
     return storedUser ? JSON.parse(storedUser) : null;
   });
-  
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const logoutTimer = useRef(null);
 
+  // Initialize auth state from localStorage on mount
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -34,124 +32,12 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // Reset logout timer for auto-logout after inactivity
   const resetLogoutTimer = () => {
     clearTimeout(logoutTimer.current);
     logoutTimer.current = setTimeout(() => {
       logout();
     }, 5 * 60 * 1000); // 5 minutes of inactivity
-  };
-
-  const login = async (username, password) => {
-    try {
-      // First check user exists
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username', username)
-        .single();
-
-      if (userError) throw new Error('Invalid credentials');
-
-      // Check user active status
-      if (!userData.is_active) {
-        return { 
-          user: null, 
-          error: 'Account is not active. Please contact the administrator.',
-          accountInactive: true
-        };
-      }
-
-      // First check if there's a valid temporary password
-      if (userData?.temp_password) {
-        const tempPasswordValid = 
-          userData.temp_password === password && 
-          new Date(userData.temp_password_expires) > new Date();
-
-        if (tempPasswordValid) {
-          return { 
-            user: userData, 
-            error: null, 
-            passwordChangeRequired: true
-          };
-        }
-      }
-
-      // If no valid temp password, check regular password
-      if (!userData.password) {
-        throw new Error('Invalid credentials');
-      }
-
-      const isValidPassword = await bcrypt.compare(password, userData.password);
-
-      if (!isValidPassword) {
-        throw new Error('Invalid credentials');
-      }
-
-      // Update last login
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ 
-          last_login: new Date().toISOString() 
-        })
-        .eq('id', userData.id);
-
-      if (updateError) console.error('Error updating last login:', updateError);
-
-      return { 
-        user: userData, 
-        error: null, 
-        passwordChangeRequired: false
-      };
-    } catch (error) {
-      console.error('Login error:', error.message);
-      return { user: null, error: error.message };
-    }
-  };
-
-  const updatePassword = async (userId, newPassword) => {
-    try {
-      // Hash the new password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          password: hashedPassword,
-          temp_password: null,
-          temp_password_expires: null,
-          password_change_required: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-
-      if (updateError) throw updateError;
-
-      // Fetch updated user information
-      const { data: updatedUser, error: fetchError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Update user in state and localStorage
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      resetLogoutTimer();
-
-      return { error: null };
-    } catch (error) {
-      console.error('Password update error:', error);
-      return { error: error.message };
-    }
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    clearTimeout(logoutTimer.current);
   };
 
   // Reset logout timer on user activity
@@ -175,24 +61,143 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user]);
 
-  return (
-    <AuthContext.Provider value={{ 
-      user, 
-      setUser, 
-      loading, 
-      login, 
-      logout, 
-      updatePassword 
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  // Login function
+  const login = async (username, password) => {
+    try {
+      // First check user exists
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
+        
+      if (userError) {
+        return { error: 'Invalid credentials' };
+      }
+      
+      // Check if user is active
+      if (!userData.is_active) {
+        return { 
+          accountInactive: true, 
+          error: 'Account is not active. Please contact administrator.' 
+        };
+      }
+      
+      // First check if there's a valid temporary password
+      if (userData?.temp_password) {
+        const tempPasswordValid = 
+          userData.temp_password === password && 
+          new Date(userData.temp_password_expires) > new Date();
+
+        if (tempPasswordValid) {
+          return { 
+            user: userData, 
+            error: null, 
+            passwordChangeRequired: true 
+          };
+        }
+      }
+      
+      // If no valid temp password, check regular password
+      if (!userData.password) {
+        return { error: 'Invalid credentials' };
+      }
+
+      const isValidPassword = await bcrypt.compare(password, userData.password);
+
+      if (!isValidPassword) {
+        return { error: 'Invalid credentials' };
+      }
+      
+      // Update last login timestamp
+      await supabase
+        .from('users')
+        .update({
+          last_login: new Date().toISOString()
+        })
+        .eq('id', userData.id);
+      
+      // Set user in state and local storage
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      resetLogoutTimer();
+      
+      return { user: userData };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { error: 'An error occurred during login. Please try again.' };
+    }
+  };
+
+  // Logout function
+  const logout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    clearTimeout(logoutTimer.current);
+  };
+
+  // Update password function
+  const updatePassword = async (userId, newPassword) => {
+    try {
+      // Hash the new password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          password: hashedPassword,
+          temp_password: null,
+          temp_password_expires: null,
+          password_change_required: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+        
+      if (error) throw error;
+      
+      // Fetch updated user information
+      const { data: updatedUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Update user in state and localStorage
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      resetLogoutTimer();
+      
+      return { error: null };
+    } catch (err) {
+      console.error('Password update error:', err);
+      return { error: 'Failed to update password. Please try again.' };
+    }
+  };
+
+  // Value to be provided by the context
+  const value = {
+    user,
+    setUser,
+    loading,
+    error,
+    login,
+    logout,
+    updatePassword
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === null) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
+
+export default useAuth;

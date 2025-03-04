@@ -65,21 +65,21 @@ const App = () => {
       <Route path="/login" element={user ? <Navigate to={getRoleBasedDashboard(user.role)} replace /> : <LoginPage />} />
 
       {/* Dashboard routes */}
-      <Route path="/admindashboard" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><AdminDashboard /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/admindashboard" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><AdminDashboard /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/userdashboard" element={<ProtectedRoute requiredRoles={['user']}><AuthenticatedLayout><UserDashboard /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/orgdashboard" element={<ProtectedRoute requiredRoles={['organization']}><AuthenticatedLayout><OrgDashboard /></AuthenticatedLayout></ProtectedRoute>} />
       
-      {/* User Management routes - only for administrators */}
-      <Route path="/user-management" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><UserManagement /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/role-management" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><RoleManagement /></AuthenticatedLayout></ProtectedRoute>} />
+      {/* User Management routes - only for admins */}
+      <Route path="/user-management" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><UserManagement /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/role-management" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><RoleManagement /></AuthenticatedLayout></ProtectedRoute>} />
 
       {/* Request routes - accessible by all authenticated users */}
       <Route path="/requests" element={<ProtectedRoute><AuthenticatedLayout><RequestList /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/requests/:id" element={<ProtectedRoute><AuthenticatedLayout><RequestDetail /></AuthenticatedLayout></ProtectedRoute>} />
       
-      {/* Analytics and reporting - only for administrators */}
-      <Route path="/request-analytics" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><RequestAnalytics /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/reports/requests" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><RequestReports /></AuthenticatedLayout></ProtectedRoute>} />
+      {/* Analytics and reporting - only for admins */}
+      <Route path="/request-analytics" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><RequestAnalytics /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/reports/requests" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><RequestReports /></AuthenticatedLayout></ProtectedRoute>} />
 
       {/* Root route redirect */}
       <Route path="/" element={<Navigate to={user ? getRoleBasedDashboard(user.role) : "/login"} replace />} />

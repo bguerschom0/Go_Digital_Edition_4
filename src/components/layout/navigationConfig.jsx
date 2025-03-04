@@ -9,11 +9,13 @@ import {
   CheckSquare,
   UserCog,
   Building,
-  MessageSquare
+  MessageSquare,
+  ListChecks,
+  UserPlus
 } from 'lucide-react';
 
 export const roleBasedNavigation = {
-  admin: [
+  administrator: [
     {
       name: 'Dashboard',
       path: '/admindashboard',
@@ -63,15 +65,27 @@ export const roleBasedNavigation = {
       path: '/user-management',
       icon: UserCog
     },
+    {
+      name: 'Organizations',
+      path: '/organizations',
+      icon: Building,
+      children: [
         {
+          name: 'Organization List',
+          path: '/organizations',
+          icon: ListChecks
+        },
+        {
+          name: 'Organization Users',
+          path: '/organization-users',
+          icon: UserPlus
+        },
+            {
       name: 'Organization',
       path: '/organization-profile',
       icon: Building
-    },
-    {
-      name: 'Contact Support',
-      path: '/contact',
-      icon: MessageSquare
+    }
+      ]
     }
   ],
   

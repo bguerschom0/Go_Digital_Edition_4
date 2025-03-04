@@ -3,8 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Moon, Sun, ChevronDown, User, LogOut, Menu, X, UserCircle } from 'lucide-react';
 import { roleBasedNavigation } from './navigationConfig';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog, DialogContent } from '../ui/dialog';
 import { getRoleBasedDashboard } from '../../utils/roleRoutes';
 import NotificationBell from '../notifications/NotificationBell';
 
@@ -26,6 +25,7 @@ const Header = () => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
+  // Get navigation items based on the user's role
   const navigationItems = user ? roleBasedNavigation[user.role] || [] : [];
 
   // Handle click outside dropdown and submenus
@@ -102,6 +102,20 @@ const Header = () => {
 
   const toggleDarkMode = () => {
     setIsDarkMode(prev => !prev);
+  };
+
+  // Helper function to display role name
+  const getRoleDisplayName = (role) => {
+    switch(role) {
+      case 'administrator':
+        return 'Administrator';
+      case 'organization':
+        return 'Organization';
+      case 'user':
+        return 'User';
+      default:
+        return role;
+    }
   };
 
   return (
@@ -210,7 +224,7 @@ const Header = () => {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.full_name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{user.username}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{getRoleDisplayName(user.role)}</p>
                           </div>
                         </div>
                       </div>
@@ -263,7 +277,9 @@ const Header = () => {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user?.full_name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{user?.username}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {user ? getRoleDisplayName(user.role) : ''}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -403,7 +419,7 @@ const Header = () => {
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Role</span>
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {user?.role}
+                    {user ? getRoleDisplayName(user.role) : ''}
                   </span>
                 </div>
 

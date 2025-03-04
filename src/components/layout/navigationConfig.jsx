@@ -61,11 +61,6 @@ export const roleBasedNavigation = {
     {
       name: 'User Management',
       path: '/user-management',
-      icon: Users
-    },
-    {
-      name: 'Role Management',
-      path: '/role-management',
       icon: UserCog
     },
         {

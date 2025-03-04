@@ -15,12 +15,24 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import useOrganization from '../../hooks/useOrganization';
+
+// Utility function to validate UUID format
+const isValidUUID = (str) => {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
 
 const OrganizationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { getOrganizationById, createOrganization, updateOrganization } = useOrganization();
+  
+  // Check if this is a new organization or a special route
   const isNewOrg = id === 'new';
+  const isSpecialRoute = !isNewOrg && !isValidUUID(id);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -31,31 +43,40 @@ const OrganizationDetail = () => {
     is_active: true
   });
   
-  const [loading, setLoading] = useState(!isNewOrg);
+  const [loading, setLoading] = useState(!isNewOrg && !isSpecialRoute);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [userCount, setUserCount] = useState(0);
   const [requestCount, setRequestCount] = useState(0);
   
   useEffect(() => {
+    // Handle special routes (like 'users')
+    if (isSpecialRoute) {
+      if (id === 'users') {
+        navigate('/organizations/users');
+      } else {
+        setError(`Invalid organization ID: ${id}`);
+        setLoading(false);
+      }
+      return;
+    }
+    
+    // Don't fetch for new orgs
     if (!isNewOrg) {
       fetchOrganizationData();
     }
-  }, [id]);
+  }, [id, isNewOrg, isSpecialRoute]);
   
   const fetchOrganizationData = async () => {
     try {
       setLoading(true);
-      // Fetch organization details
-      const { data: orgData, error: orgError } = await supabase
-        .from('v4_organizations')
-        .select('*')
-        .eq('id', id)
-        .single();
-        
-      if (orgError) throw orgError;
+      setError(null);
       
-      setFormData(orgData);
+      // Fetch organization details using the hook
+      const orgData = await getOrganizationById(id);
+      if (orgData) {
+        setFormData(orgData);
+      }
       
       // Fetch user count
       const { count: userCount, error: userError } = await supabase
@@ -79,7 +100,7 @@ const OrganizationDetail = () => {
       
     } catch (error) {
       console.error('Error fetching organization:', error);
-      setError(error.message);
+      setError(error.message || 'Failed to load organization details');
     } finally {
       setLoading(false);
     }
@@ -100,32 +121,25 @@ const OrganizationDetail = () => {
     
     try {
       if (isNewOrg) {
-        // Create new organization
-        const { data, error } = await supabase
-          .from('v4_organizations')
-          .insert([formData])
-          .select()
-          .single();
-          
-        if (error) throw error;
+        // Create new organization using the hook
+        const data = await createOrganization(formData);
         
-        // Redirect to the new organization page
-        navigate(`/organizations/${data.id}`, { replace: true });
+        if (data && data.id) {
+          // Redirect to the new organization page
+          navigate(`/organizations/${data.id}`, { replace: true });
+        } else {
+          throw new Error('Failed to create organization');
+        }
       } else {
-        // Update existing organization
-        const { error } = await supabase
-          .from('v4_organizations')
-          .update(formData)
-          .eq('id', id);
-          
-        if (error) throw error;
+        // Update existing organization using the hook
+        await updateOrganization(id, formData);
         
         // Refresh data
         fetchOrganizationData();
       }
     } catch (error) {
       console.error('Error saving organization:', error);
-      setError(error.message);
+      setError(error.message || 'Failed to save organization');
     } finally {
       setSaving(false);
     }
@@ -135,6 +149,35 @@ const OrganizationDetail = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 flex justify-center items-center">
         <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+  
+  // Handle invalid ID case
+  if (isSpecialRoute && error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+        <div className="max-w-3xl mx-auto">
+          <Link
+            to="/organizations"
+            className="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mb-6"
+          >
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            Back to Organizations
+          </Link>
+          
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8 text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Organization Not Found</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">{error}</p>
+            <Link
+              to="/organizations"
+              className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
+            >
+              Return to Organizations
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

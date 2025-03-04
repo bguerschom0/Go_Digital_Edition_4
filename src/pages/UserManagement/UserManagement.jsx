@@ -22,7 +22,7 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     username: '',
     full_name: '',
-    User_Role_V4: '',
+    user_role_v4: '',
     is_active: true
   });
 
@@ -31,14 +31,14 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
       setFormData({
         username: user.username || '',
         full_name: user.full_name || '',
-        User_Role_V4: user.User_Role_V4 || '',
+        user_role_v4: user.user_role_v4 || '',
         is_active: user.is_active ?? true
       });
     } else {
       setFormData({
         username: '',
         full_name: '',
-        User_Role_V4: '',
+        user_role_v4: '',
         is_active: true
       });
     }
@@ -112,8 +112,8 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
               Role
             </label>
             <select
-              value={formData.User_Role_V4}
-              onChange={(e) => setFormData({ ...formData, User_Role_V4: e.target.value })}
+              value={formData.user_role_v4}
+              onChange={(e) => setFormData({ ...formData, user_role_v4: e.target.value })}
               className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 
                        bg-white dark:bg-gray-900 text-gray-900 dark:text-white
                        focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
@@ -297,9 +297,9 @@ const UserManagement = () => {
         query = query.eq('is_active', isActive);
       }
       
-      // Apply role filter using User_Role_V4
+      // Apply role filter using user_role_v4
       if (roleFilter !== 'all') {
-        query = query.eq('User_Role_V4', roleFilter);
+        query = query.eq('user_role_v4', roleFilter);
       }
 
       if (searchTerm) {
@@ -440,9 +440,9 @@ const UserManagement = () => {
     }
   };
 
-  // Get display role from User_Role_V4
+  // Get display role from user_role_v4
   const getUserRole = (user) => {
-    return user.User_Role_V4 || 'user'; // Default to 'user' if not set
+    return user.user_role_v4 || 'user'; // Default to 'user' if not set
   };
 
   // Get display role text

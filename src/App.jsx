@@ -47,7 +47,7 @@ const ProtectedRoute = ({ children, requiredRoles = [] }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (requiredRoles.length > 0 && !requiredRoles.includes(user.role?.toLowerCase())) {
+  if (requiredRoles.length > 0 && !requiredRoles.includes(user.user_role_v4?.toLowerCase())) {
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -68,7 +68,7 @@ const App = () => {
   return (
     <Routes>
       {/* Public route */}
-      <Route path="/login" element={user ? <Navigate to={getRoleBasedDashboard(user.role)} replace /> : <LoginPage />} />
+      <Route path="/login" element={user ? <Navigate to={getRoleBasedDashboard(user.user_role_v4)} replace /> : <LoginPage />} />
 
       {/* Dashboard routes */}
       <Route path="/admindashboard" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><AdminDashboard /></AuthenticatedLayout></ProtectedRoute>} />
@@ -93,7 +93,7 @@ const App = () => {
       <Route path="/reports/requests" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><RequestReports /></AuthenticatedLayout></ProtectedRoute>} />
 
       {/* Root route redirect */}
-      <Route path="/" element={<Navigate to={user ? getRoleBasedDashboard(user.role) : "/login"} replace />} />
+      <Route path="/" element={<Navigate to={user ? getRoleBasedDashboard(user.user_role_v4) : "/login"} replace />} />
 
       {/* Unauthorized and catch-all routes */}
       <Route path="/unauthorized" element={<Unauthorized />} />

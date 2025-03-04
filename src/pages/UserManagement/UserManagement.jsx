@@ -22,7 +22,7 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     username: '',
     full_name: '',
-    User_Role_V4: 'user',
+    User_Role_V4: '',
     is_active: true
   });
 
@@ -31,14 +31,14 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
       setFormData({
         username: user.username || '',
         full_name: user.full_name || '',
-        User_Role_V4: user.User_Role_V4 || 'user',
+        User_Role_V4: user.User_Role_V4 || '',
         is_active: user.is_active ?? true
       });
     } else {
       setFormData({
         username: '',
         full_name: '',
-        User_Role_V4: 'user',
+        User_Role_V4: '',
         is_active: true
       });
     }

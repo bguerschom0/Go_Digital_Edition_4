@@ -3,7 +3,6 @@ import {
   Users, 
   FileText, 
   BarChart, 
-  Settings,
   Bookmark,
   Upload,
   Clock,
@@ -14,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const roleBasedNavigation = {
-  admin: [
+  administrator: [
     {
       name: 'Dashboard',
       path: '/admindashboard',
@@ -56,11 +55,6 @@ export const roleBasedNavigation = {
           name: 'Request Reports',
           path: '/reports/requests',
           icon: FileText
-        },
-        {
-          name: 'Performance Reports',
-          path: '/reports/performance',
-          icon: BarChart
         }
       ]
     },
@@ -77,36 +71,6 @@ export const roleBasedNavigation = {
   ],
   
   user: [
-    {
-      name: 'Dashboard',
-      path: '/userdashboard',
-      icon: LayoutDashboard
-    },
-    {
-      name: 'Requests',
-      path: '/requests',
-      icon: FileText,
-      children: [
-        {
-          name: 'All Requests',
-          path: '/requests',
-          icon: Bookmark
-        },
-        {
-          name: 'Pending Requests',
-          path: '/requests?status=pending',
-          icon: Clock
-        },
-        {
-          name: 'Completed Requests',
-          path: '/requests?status=completed',
-          icon: CheckSquare
-        }
-      ]
-    }
-  ],
-  
-  processor: [
     {
       name: 'Dashboard',
       path: '/userdashboard',
@@ -178,58 +142,6 @@ export const roleBasedNavigation = {
       name: 'Contact Support',
       path: '/contact',
       icon: MessageSquare
-    }
-  ],
-  
-  supervisor: [
-    {
-      name: 'Dashboard',
-      path: '/admindashboard',
-      icon: LayoutDashboard
-    },
-    {
-      name: 'Requests',
-      path: '/requests',
-      icon: FileText,
-      children: [
-        {
-          name: 'All Requests',
-          path: '/requests',
-          icon: Bookmark
-        },
-        {
-          name: 'Pending Requests',
-          path: '/requests?status=pending',
-          icon: Clock
-        },
-        {
-          name: 'Completed Requests',
-          path: '/requests?status=completed',
-          icon: CheckSquare
-        }
-      ]
-    },
-    {
-      name: 'Reports',
-      path: '/reports',
-      icon: BarChart,
-      children: [
-        {
-          name: 'Request Analytics',
-          path: '/request-analytics',
-          icon: BarChart
-        },
-        {
-          name: 'Request Reports',
-          path: '/reports/requests',
-          icon: FileText
-        },
-        {
-          name: 'Performance Reports',
-          path: '/reports/performance',
-          icon: BarChart
-        }
-      ]
     }
   ]
 };

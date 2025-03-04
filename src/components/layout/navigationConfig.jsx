@@ -63,7 +63,7 @@ export const roleBasedNavigation = {
     {
       name: 'User Management',
       path: '/user-management',
-      icon: UserCog
+      icon: Users
     },
     {
       name: 'Organizations',
@@ -79,12 +79,7 @@ export const roleBasedNavigation = {
           name: 'Organization Users',
           path: '/organization-users',
           icon: UserPlus
-        },
-            {
-      name: 'Organization',
-      path: '/organization-profile',
-      icon: Building
-    }
+        }
       ]
     }
   ],

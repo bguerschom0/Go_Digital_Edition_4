@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const roleBasedNavigation = {
-  administrator: [
+  admin: [
     {
       name: 'Dashboard',
       path: '/admindashboard',
@@ -67,6 +67,16 @@ export const roleBasedNavigation = {
       name: 'Role Management',
       path: '/role-management',
       icon: UserCog
+    },
+        {
+      name: 'Organization',
+      path: '/organization-profile',
+      icon: Building
+    },
+    {
+      name: 'Contact Support',
+      path: '/contact',
+      icon: MessageSquare
     }
   ],
   

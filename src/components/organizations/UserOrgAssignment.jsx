@@ -1,29 +1,22 @@
-import { useState, useEffect } from 'react';
-import { Loader2, Plus, Trash2, Check, Star, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Loader2, Plus, Trash2, Check, Star, StarOff } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 
-const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) => {
+const UserOrgAssignment = ({ user, organizations, onRefresh }) => {
   const [userOrgs, setUserOrgs] = useState([]);
   const [selectedOrg, setSelectedOrg] = useState('');
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
   const [removing, setRemoving] = useState(null);
   const [makingPrimary, setMakingPrimary] = useState(null);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (user && user.id) {
-      fetchUserOrganizations();
-    }
-  }, [user?.id]);
+    fetchUserOrganizations();
+  }, [user.id]);
 
   const fetchUserOrganizations = async () => {
-    if (!user || !user.id) return;
-    
     try {
       setLoading(true);
-      setError(null);
-      
       const { data, error } = await supabase
         .from('v4_user_organizations')
         .select(`
@@ -48,9 +41,8 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
       }));
 
       setUserOrgs(formattedData);
-    } catch (err) {
-      console.error('Error fetching user organizations:', err);
-      setError(`Failed to load organizations: ${err.message}`);
+    } catch (error) {
+      console.error('Error fetching user organizations:', error);
     } finally {
       setLoading(false);
     }
@@ -61,7 +53,6 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
     
     try {
       setAssigning(true);
-      setError(null);
       
       // Check if this is the first organization assignment (make primary if so)
       const isPrimary = userOrgs.length === 0;
@@ -84,35 +75,17 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
       
       // Reset the select field
       setSelectedOrg('');
-    } catch (err) {
-      console.error('Error assigning user to organization:', err);
-      setError(`Failed to assign user: ${err.message}`);
+    } catch (error) {
+      console.error('Error assigning user to organization:', error);
+      alert('Failed to assign user to organization. Please try again.');
     } finally {
       setAssigning(false);
     }
   };
 
-  const removeFromOrganization = async (assignmentId, orgId) => {
-    // Confirm before removing the last organization
-    if (userOrgs.length === 1) {
-      const confirm = window.confirm(
-        'This is the user\'s only organization. Removing it may affect their access. Are you sure you want to continue?'
-      );
-      if (!confirm) return;
-    }
-    
-    // Confirm before removing primary organization
-    const isRemovingPrimary = userOrgs.find(org => org.id === assignmentId)?.is_primary;
-    if (isRemovingPrimary && userOrgs.length > 1) {
-      const confirm = window.confirm(
-        'You are removing the user\'s primary organization. Another organization will be set as primary. Continue?'
-      );
-      if (!confirm) return;
-    }
-    
+  const removeFromOrganization = async (assignmentId) => {
     try {
       setRemoving(assignmentId);
-      setError(null);
       
       const { error } = await supabase
         .from('v4_user_organizations')
@@ -121,25 +94,12 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
 
       if (error) throw error;
       
-      // If we deleted the primary organization and there are others left, set a new primary
-      if (isRemovingPrimary && userOrgs.length > 1) {
-        const newPrimaryOrg = userOrgs.find(org => org.id !== assignmentId);
-        if (newPrimaryOrg) {
-          const { error: updateError } = await supabase
-            .from('v4_user_organizations')
-            .update({ is_primary: true })
-            .eq('id', newPrimaryOrg.id);
-            
-          if (updateError) throw updateError;
-        }
-      }
-      
       // Refresh the list
       await fetchUserOrganizations();
       if (onRefresh) onRefresh();
-    } catch (err) {
-      console.error('Error removing user from organization:', err);
-      setError(`Failed to remove user: ${err.message}`);
+    } catch (error) {
+      console.error('Error removing user from organization:', error);
+      alert('Failed to remove user from organization. Please try again.');
     } finally {
       setRemoving(null);
     }
@@ -148,7 +108,10 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
   const setPrimaryOrganization = async (assignmentId) => {
     try {
       setMakingPrimary(assignmentId);
-      setError(null);
+      
+      // Begin transaction with two operations:
+      // 1. Set all organizations for this user to not primary
+      // 2. Set the selected organization to primary
       
       // First reset all to non-primary
       const { error: resetError } = await supabase
@@ -169,28 +132,23 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
       // Refresh the list
       await fetchUserOrganizations();
       if (onRefresh) onRefresh();
-    } catch (err) {
-      console.error('Error setting primary organization:', err);
-      setError(`Failed to set primary organization: ${err.message}`);
+    } catch (error) {
+      console.error('Error setting primary organization:', error);
+      alert('Failed to set primary organization. Please try again.');
     } finally {
       setMakingPrimary(null);
     }
   };
 
-  // Filter out organizations that the user is already assigned to
   const availableOrganizations = organizations.filter(
     org => !userOrgs.some(userOrg => userOrg.organization_id === org.id)
   );
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6 ${
-      highlightOrgId && userOrgs.some(org => org.organization_id === highlightOrgId)
-        ? 'border-l-4 border-indigo-500 dark:border-indigo-400'
-        : ''
-    }`}>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{user.full_name || user.username}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{user.full_name}</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {user.username} {user.email ? `• ${user.email}` : ''}
           </p>
@@ -216,7 +174,7 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
           <button
             onClick={assignToOrganization}
             disabled={!selectedOrg || assigning}
-            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black 
+            className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black 
                      rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors
                      flex items-center disabled:opacity-50"
           >
@@ -229,14 +187,6 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
           </button>
         </div>
       </div>
-      
-      {/* Error message */}
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg flex items-start gap-2">
-          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
       
       {/* Current organizations list */}
       <div>
@@ -261,7 +211,7 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
                     Organization
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
+                    Primary
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Actions
@@ -270,9 +220,7 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {userOrgs.map((org) => (
-                  <tr key={org.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                    highlightOrgId === org.organization_id ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''
-                  }`}>
+                  <tr key={org.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {org.name}
                     </td>
@@ -280,7 +228,7 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
                       {org.is_primary ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200">
                           <Check className="w-3 h-3 mr-1" />
-                          Primary Organization
+                          Primary
                         </span>
                       ) : (
                         <button
@@ -301,7 +249,7 @@ const UserOrgAssignment = ({ user, organizations, onRefresh, highlightOrgId }) =
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
-                        onClick={() => removeFromOrganization(org.id, org.organization_id)}
+                        onClick={() => removeFromOrganization(org.id)}
                         disabled={removing !== null}
                         className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 
                                  flex items-center ml-auto disabled:opacity-50"

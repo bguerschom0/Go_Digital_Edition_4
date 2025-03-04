@@ -24,11 +24,11 @@ export const AuthProvider = ({ children }) => {
       const parsedUser = JSON.parse(storedUser);
       // Check if user is active
       if (parsedUser.is_active) {
-        // Ensure the user has the processed role from User_Role_V4
+        // Ensure the user has the processed role from user_role_v4
         if (!parsedUser.processed_role) {
           const userWithRole = {
             ...parsedUser,
-            role: parsedUser.User_Role_V4 || mapLegacyRole(parsedUser.role),
+            role: parsedUser.user_role_v4 || mapLegacyRole(parsedUser.role),
             processed_role: true
           };
           setUser(userWithRole);
@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }) => {
           // Process the role for temporary password login
           const userWithRole = {
             ...userData,
-            role: userData.User_Role_V4 || mapLegacyRole(userData.role),
+            role: userData.user_role_v4 || mapLegacyRole(userData.role),
             processed_role: true
           };
           
@@ -129,10 +129,10 @@ export const AuthProvider = ({ children }) => {
 
       if (updateError) console.error('Error updating last login:', updateError);
 
-      // Process the role from User_Role_V4 or legacy role
+      // Process the role from user_role_v4 or legacy role
       const userWithRole = {
         ...userData,
-        role: userData.User_Role_V4 || mapLegacyRole(userData.role),
+        role: userData.user_role_v4 || mapLegacyRole(userData.role),
         processed_role: true
       };
 
@@ -181,7 +181,7 @@ export const AuthProvider = ({ children }) => {
       // Process the role for the updated user
       const updatedUserWithRole = {
         ...updatedUser,
-        role: updatedUser.User_Role_V4 || mapLegacyRole(updatedUser.role),
+        role: updatedUser.user_role_v4 || mapLegacyRole(updatedUser.role),
         processed_role: true
       };
 

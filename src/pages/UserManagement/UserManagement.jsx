@@ -45,7 +45,7 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
   }, [user]);
 
   const roles = [
-    { value: 'admin', label: 'Admin' },
+    { value: 'administrator', label: 'Administrator' },
     { value: 'user', label: 'User' },
     { value: 'organization', label: 'Organization' }
   ];
@@ -261,7 +261,7 @@ const UserManagement = () => {
 
   // Available roles (simplified to 3 roles)
   const roles = [
-    { value: 'admin', label: 'Admin' },
+    { value: 'administrator', label: 'Administrator' },
     { value: 'user', label: 'User' },
     { value: 'organization', label: 'Organization' }
   ];
@@ -442,14 +442,14 @@ const UserManagement = () => {
 
   // Get display role from user_role_v4
   const getUserRole = (user) => {
-    return user.user_role_v4 || 'user'; // Default to 'user' if not set
+    return user.user_role_v4 || ''; // Default to 'user' if not set
   };
 
   // Get display role text
   const getDisplayRole = (role) => {
     switch(role) {
-      case 'admin':
-        return 'Admin';
+      case 'administrator':
+        return 'Administrator';
       case 'organization':
         return 'Organization';
       case 'user':
@@ -579,6 +579,9 @@ const UserManagement = () => {
                       Status
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Created At
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Last Login
                     </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -614,10 +617,6 @@ const UserManagement = () => {
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {user.username}
                               </div>
-                              {user.email && (
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                  {user.email}
-                                </div>
                               )}
                             </div>
                           </div>
@@ -638,7 +637,12 @@ const UserManagement = () => {
                             {user.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {user.created_at 
+                              ? new Date(user.created_at).toLocaleString() 
+                              : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {user.last_login 
                             ? new Date(user.last_login).toLocaleString() 
                             : 'Never'}

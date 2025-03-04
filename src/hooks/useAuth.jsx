@@ -73,14 +73,37 @@ export const AuthProvider = ({ children }) => {
         .update({ last_login: new Date().toISOString() })
         .eq('id', userData.id);
       
-      // Store user in state and localStorage
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
+      // IMPORTANT: Set role based on User_Role_V4 if available, otherwise use legacy role
+      const userWithProcessedRole = {
+        ...userData,
+        // Use User_Role_V4 if available, otherwise map legacy role to one of the three new roles
+        role: userData.User_Role_V4 || mapLegacyRole(userData.role)
+      };
       
-      return { user: userData };
+      // Store user in state and localStorage
+      setUser(userWithProcessedRole);
+      localStorage.setItem('user', JSON.stringify(userWithProcessedRole));
+      
+      return { user: userWithProcessedRole };
     } catch (error) {
       console.error('Login error:', error);
       return { error: 'An unexpected error occurred' };
+    }
+  };
+
+  // Mapping from legacy roles to new roles
+  const mapLegacyRole = (legacyRole) => {
+    switch(legacyRole?.toLowerCase()) {
+      case 'admin':
+        return 'administrator';
+      case 'processor':
+      case 'supervisor':
+      case 'user':
+        return 'user';
+      case 'organization':
+        return 'organization';
+      default:
+        return 'user'; // Default role
     }
   };
 

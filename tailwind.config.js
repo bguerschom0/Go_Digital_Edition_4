@@ -1,44 +1,42 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
   darkMode: 'class',
   theme: {
     extend: {
-      colors: {
-        primary: '#000000',
-        background: {
-          light: '#ffffff',
-          dark: '#0a0a0a'
-        }
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
       },
-      animation: {
-        'float': 'float 4s ease-in-out infinite',
-        'float-reverse': 'float-reverse 4s ease-in-out infinite',
-        'pulse': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'pulse-reverse': 'pulse-reverse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      colors: {
+        primary: {
+          50: '#f5f7ff',
+          100: '#ebf0fe',
+          200: '#d6e0fd',
+          300: '#b3c5fb',
+          400: '#8aa0f8',
+          500: '#6070f2',
+          600: '#4552e6',
+          700: '#3840cf',
+          800: '#3138a8',
+          900: '#2d3485',
+          950: '#1c1f4b',
+        },
+      },
+      boxShadow: {
+        card: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       },
       keyframes: {
-        'float': {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(20px)' },
+        'pulse-slow': {
+          '0%, 100%': { opacity: 1 },
+          '50%': { opacity: 0.7 },
         },
-        'float-reverse': {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-20px)' },
-        },
-        'pulse': {
-          '0%, 100%': { transform: 'scale(1)' },
-          '50%': { transform: 'scale(1.1)' },
-        },
-        'pulse-reverse': {
-          '0%, 100%': { transform: 'scale(1)' },
-          '50%': { transform: 'scale(0.9)' },
-        }
-      }
+      },
+      animation: {
+        'pulse-slow': 'pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
     },
   },
   plugins: [],
-}
+};

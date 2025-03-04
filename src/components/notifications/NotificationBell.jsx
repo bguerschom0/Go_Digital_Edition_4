@@ -6,7 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 
-const NotificationBell = () => {
+const NotificationBell = ({ isMobile }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
@@ -38,7 +38,7 @@ const NotificationBell = () => {
       try {
         setLoading(true);
         const { data, error } = await supabase
-          .from('notifications')
+          .from('v4_notifications')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
@@ -62,11 +62,11 @@ const NotificationBell = () => {
     
     // Set up real-time subscription for new notifications
     const notificationSubscription = supabase
-      .channel('public:notifications')
+      .channel('public:v4_notifications')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'notifications',
+        table: 'v4_notifications',
         filter: `user_id=eq.${user?.id}`
       }, (payload) => {
         // Add new notification to the list
@@ -91,7 +91,7 @@ const NotificationBell = () => {
   const markAsRead = async (id) => {
     try {
       const { error } = await supabase
-        .from('notifications')
+        .from('v4_notifications')
         .update({ is_read: true })
         .eq('id', id);
         
@@ -121,7 +121,7 @@ const NotificationBell = () => {
       setMarkingAllRead(true);
       
       const { error } = await supabase
-        .from('notifications')
+        .from('v4_notifications')
         .update({ is_read: true })
         .eq('user_id', user.id)
         .eq('is_read', false);
@@ -153,6 +153,21 @@ const NotificationBell = () => {
       setIsOpen(false);
     }
   };
+
+  if (isMobile) {
+    return (
+      <div className="relative">
+        <Bell className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+        
+        {/* Unread indicator */}
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative" ref={dropdownRef}>

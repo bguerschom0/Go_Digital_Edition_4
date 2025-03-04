@@ -7,17 +7,13 @@ export const getRoleBasedDashboard = (role) => {
   if (!role) return '/login';
   
   switch (role.toLowerCase()) {
-    case 'admin':
-      return '/admindashboard';
-    case 'supervisor':
+    case 'administrator':
       return '/admindashboard';
     case 'organization':
       return '/orgdashboard';
-    case 'processor':
-      return '/userdashboard';
     case 'user':
       return '/userdashboard';
     default:
-      return '/userdashboard';
+      return '/userdashboard'; // Default fallback
   }
 };

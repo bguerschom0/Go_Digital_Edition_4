@@ -9,19 +9,20 @@ import {
   Copy,
   Check,
   FileSpreadsheet,
-  FileText 
+  FileText,
+  Loader2 
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import  useRoleAccess  from '../../hooks/useRoleCheck';
+import useRoleAccess from '../../hooks/useRoleCheck';
 
 // User Modal Component for Create/Edit
 const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     username: '',
     full_name: '',
-    role: 'user',
+    User_Role_V4: 'user',
     is_active: true
   });
 
@@ -30,25 +31,23 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
       setFormData({
         username: user.username || '',
         full_name: user.full_name || '',
-        role: user.role || 'user',
+        User_Role_V4: user.User_Role_V4 || 'user',
         is_active: user.is_active ?? true
       });
     } else {
       setFormData({
         username: '',
         full_name: '',
-        role: 'user',
+        User_Role_V4: 'user',
         is_active: true
       });
     }
   }, [user]);
 
   const roles = [
-    { value: 'admin', label: 'Administrator' },
-    { value: 'manager', label: 'Manager' },
-    { value: 'supervisor', label: 'Supervisor' },
-    { value: 'security_guard', label: 'Security Guard' },
-    { value: 'user', label: 'User' }
+    { value: 'administrator', label: 'Administrator' },
+    { value: 'user', label: 'User' },
+    { value: 'organization', label: 'Organization' }
   ];
 
   const handleSubmit = (e) => {
@@ -113,8 +112,8 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
               Role
             </label>
             <select
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              value={formData.User_Role_V4}
+              onChange={(e) => setFormData({ ...formData, User_Role_V4: e.target.value })}
               className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 
                        bg-white dark:bg-gray-900 text-gray-900 dark:text-white
                        focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
@@ -247,7 +246,6 @@ const TempPasswordModal = ({ isOpen, onClose, tempPassword }) => {
 const UserManagement = () => {
   const { user: currentUser } = useAuth();
 
-
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -258,13 +256,22 @@ const UserManagement = () => {
   const [currentTempPassword, setCurrentTempPassword] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
+
+  // Available roles (simplified to 3 roles)
+  const roles = [
+    { value: 'administrator', label: 'Administrator' },
+    { value: 'user', label: 'User' },
+    { value: 'organization', label: 'Organization' }
+  ];
 
   useEffect(() => {
     fetchUsers();
-  }, [searchTerm]);
+  }, [searchTerm, statusFilter, roleFilter]);
 
   const generateTempPassword = () => {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()';
     let tempPassword = '';
     const randomValues = new Uint32Array(10);
     crypto.getRandomValues(randomValues);
@@ -283,6 +290,17 @@ const UserManagement = () => {
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        const isActive = statusFilter === 'active';
+        query = query.eq('is_active', isActive);
+      }
+      
+      // Apply role filter using User_Role_V4
+      if (roleFilter !== 'all') {
+        query = query.eq('User_Role_V4', roleFilter);
+      }
 
       if (searchTerm) {
         query = query.or(
@@ -347,42 +365,42 @@ const UserManagement = () => {
     }
   };
 
-const handleResetPassword = async (userId) => {
-  try {
-    // Generate a 10-character temporary password
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let tempPassword = '';
-    const randomValues = new Uint32Array(10);
-    crypto.getRandomValues(randomValues);
-    
-    randomValues.forEach((value) => {
-      tempPassword += characters[value % characters.length];
-    });
+  const handleResetPassword = async (userId) => {
+    try {
+      // Generate a 10-character temporary password
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()';
+      let tempPassword = '';
+      const randomValues = new Uint32Array(10);
+      crypto.getRandomValues(randomValues);
+      
+      randomValues.forEach((value) => {
+        tempPassword += characters[value % characters.length];
+      });
 
-    // Set expiry to 24 hours from now
-    const tempPasswordExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    
-    // Only update temp password fields, NOT the actual password
-    const { error } = await supabase
-      .from('users')
-      .update({
-        temp_password: tempPassword,
-        temp_password_expires: tempPasswordExpiry,
-        password_change_required: true,
-        updated_by: currentUser.username
-      })
-      .eq('id', userId);
+      // Set expiry to 24 hours from now
+      const tempPasswordExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      
+      // Only update temp password fields, NOT the actual password
+      const { error } = await supabase
+        .from('users')
+        .update({
+          temp_password: tempPassword,
+          temp_password_expires: tempPasswordExpiry,
+          password_change_required: true,
+          updated_by: currentUser.username
+        })
+        .eq('id', userId);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    setCurrentTempPassword(tempPassword);
-    setShowTempPasswordModal(true);
-    
-    fetchUsers();
-  } catch (error) {
-    console.error('Error resetting password:', error);
-  }
-};
+      setCurrentTempPassword(tempPassword);
+      setShowTempPasswordModal(true);
+      
+      fetchUsers();
+    } catch (error) {
+      console.error('Error resetting password:', error);
+    }
+  };
 
   const handleDeleteUser = async (userId) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
@@ -401,26 +419,45 @@ const handleResetPassword = async (userId) => {
     }
   };
 
-const exportUsers = async (format) => {
-  try {
-    const exportData = users.map(user => ({
-      'Username': user.username,
-      'Full Name': user.full_name,
-      'Role': user.role,
-      'Status': user.is_active ? 'Active' : 'Inactive',
-      'Created At': new Date(user.created_at).toLocaleString(),
-      'Created By': user.created_by,
-      'Last Login': user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'
-    }));
+  const exportUsers = async (format) => {
+    try {
+      const exportData = users.map(user => ({
+        'Username': user.username,
+        'Full Name': user.full_name,
+        'Role': getUserRole(user),
+        'Status': user.is_active ? 'Active' : 'Inactive',
+        'Created At': new Date(user.created_at).toLocaleString(),
+        'Created By': user.created_by,
+        'Last Login': user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'
+      }));
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    XLSX.utils.book_append_sheet(wb, ws, 'Users');
-    XLSX.writeFile(wb, `users_export_${new Date().toISOString().split('T')[0]}.xlsx`);
-  } catch (error) {
-    console.error('Error exporting users:', error);
-  }
-};
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Users');
+      XLSX.writeFile(wb, `users_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting users:', error);
+    }
+  };
+
+  // Get display role from User_Role_V4
+  const getUserRole = (user) => {
+    return user.User_Role_V4 || 'user'; // Default to 'user' if not set
+  };
+
+  // Get display role text
+  const getDisplayRole = (role) => {
+    switch(role) {
+      case 'administrator':
+        return 'Administrator';
+      case 'organization':
+        return 'Organization';
+      case 'user':
+        return 'User';
+      default:
+        return 'User'; // Default fallback
+    }
+  };
 
   // Calculate pagination
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -439,15 +476,14 @@ const exportUsers = async (format) => {
             </h1>
 
             <div className="flex flex-wrap gap-3">
-<button
-  onClick={() => exportUsers()}
-  className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-           hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
->
-  <FileSpreadsheet className="w-4 h-4 mr-2" />
-  Export
-</button>
-
+              <button
+                onClick={() => exportUsers()}
+                className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
+                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Export
+              </button>
 
               <button
                 onClick={() => {
@@ -464,19 +500,66 @@ const exportUsers = async (format) => {
             </div>
           </div>
 
-          {/* Search */}
-          <div className="max-w-md">
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-              />
+          {/* Filters & Search */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Search */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Search Users
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by name, username, or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                             focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                  />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                </div>
+              </div>
+              
+              {/* Status filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              
+              {/* Role filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Role
+                </label>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                >
+                  <option value="all">All Roles</option>
+                  {roles.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -496,7 +579,7 @@ const exportUsers = async (format) => {
                       Status
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Created
+                      Last Login
                     </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Actions
@@ -507,7 +590,10 @@ const exportUsers = async (format) => {
                   {loading ? (
                     <tr>
                       <td colSpan="5" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                        Loading...
+                        <div className="flex justify-center items-center">
+                          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                          Loading users...
+                        </div>
                       </td>
                     </tr>
                   ) : currentItems.length === 0 ? (
@@ -523,21 +609,28 @@ const exportUsers = async (format) => {
                           <div className="flex items-center">
                             <div>
                               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {user.username}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {user.full_name}
                               </div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {user.username}
+                              </div>
+                              {user.email && (
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {user.email}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                            {user.role}
+                          <span 
+                            className="px-3 py-1.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                          >
+                            {getDisplayRole(getUserRole(user))}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          <span className={`px-3 py-1.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             user.is_active
                               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
                               : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
@@ -546,7 +639,9 @@ const exportUsers = async (format) => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(user.created_at).toLocaleDateString()}
+                          {user.last_login 
+                            ? new Date(user.last_login).toLocaleString() 
+                            : 'Never'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-2">
@@ -582,70 +677,78 @@ const exportUsers = async (format) => {
             </div>
 
             {/* Pagination */}
-            <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
-              <div className="flex-1 flex justify-between sm:hidden">
-<button
-  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-  disabled={currentPage === 1}
-  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-700 
-             bg-white text-sm font-medium text-gray-500 dark:text-gray-300 
-             hover:bg-gray-50 dark:hover:bg-gray-800"
->
-  Previous
-</button>
-<button
-  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-  disabled={currentPage === totalPages}
-  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-700 
-             bg-white text-sm font-medium text-gray-500 dark:text-gray-300 
-             hover:bg-gray-50 dark:hover:bg-gray-800"
->
-  Next
-</button>
-              </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                    <span className="font-medium">
-                      {Math.min(indexOfLastItem, users.length)}
-                    </span>{' '}
-                    of <span className="font-medium">{users.length}</span> results
-                  </p>
+            {!loading && users.length > itemsPerPage && (
+              <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 
+                             bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-300 
+                             hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 
+                             bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-300 
+                             hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Next
+                  </button>
                 </div>
-                <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                    >
-                      Previous
-                    </button>
-{[...Array(totalPages)].map((_, i) => (
-  <button
-    key={i + 1}
-    onClick={() => setCurrentPage(i + 1)}
-    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium
-      ${currentPage === i + 1
-        ? 'z-10 bg-black text-white dark:bg-white dark:text-black'
-        : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
-      } border-gray-300 dark:border-gray-700 rounded-md`}
-  >
-    {i + 1}
-  </button>
-))}
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                    >
-                      Next
-                    </button>
-                  </nav>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
+                      <span className="font-medium">
+                        {Math.min(indexOfLastItem, users.length)}
+                      </span>{' '}
+                      of <span className="font-medium">{users.length}</span> results
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-700 
+                                 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-300
+                                 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        <span className="sr-only">Previous</span>
+                        &larr;
+                      </button>
+                      {Array.from({ length: totalPages }).map((_, i) => (
+                        <button
+                          key={i + 1}
+                          onClick={() => setCurrentPage(i + 1)}
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium
+                                   ${currentPage === i + 1
+                                      ? 'z-10 bg-black text-white dark:bg-white dark:text-black border-black dark:border-white'
+                                      : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
+                                    }`}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-700 
+                                 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-300
+                                 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        <span className="sr-only">Next</span>
+                        &rarr;
+                      </button>
+                    </nav>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

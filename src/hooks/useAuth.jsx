@@ -24,7 +24,18 @@ export const AuthProvider = ({ children }) => {
       const parsedUser = JSON.parse(storedUser);
       // Check if user is active
       if (parsedUser.is_active) {
-        setUser(parsedUser);
+        // Ensure the user has the processed role from User_Role_V4
+        if (!parsedUser.processed_role) {
+          const userWithRole = {
+            ...parsedUser,
+            role: parsedUser.User_Role_V4 || mapLegacyRole(parsedUser.role),
+            processed_role: true
+          };
+          setUser(userWithRole);
+          localStorage.setItem('user', JSON.stringify(userWithRole));
+        } else {
+          setUser(parsedUser);
+        }
         resetLogoutTimer();
       } else {
         // Clear user if account is not active
@@ -33,6 +44,20 @@ export const AuthProvider = ({ children }) => {
     }
     setLoading(false);
   }, []);
+
+  // Mapping from legacy roles to new roles
+  const mapLegacyRole = (legacyRole) => {
+    switch(legacyRole?.toLowerCase()) {
+      case 'admin':
+        return 'admin';
+      case 'user':
+        return 'user';
+      case 'organization':
+        return 'organization';
+      default:
+        return 'user'; // Default role
+    }
+  };
 
   const resetLogoutTimer = () => {
     clearTimeout(logoutTimer.current);
@@ -68,8 +93,15 @@ export const AuthProvider = ({ children }) => {
           new Date(userData.temp_password_expires) > new Date();
 
         if (tempPasswordValid) {
+          // Process the role for temporary password login
+          const userWithRole = {
+            ...userData,
+            role: userData.User_Role_V4 || mapLegacyRole(userData.role),
+            processed_role: true
+          };
+          
           return { 
-            user: userData, 
+            user: userWithRole, 
             error: null, 
             passwordChangeRequired: true
           };
@@ -97,8 +129,18 @@ export const AuthProvider = ({ children }) => {
 
       if (updateError) console.error('Error updating last login:', updateError);
 
+      // Process the role from User_Role_V4 or legacy role
+      const userWithRole = {
+        ...userData,
+        role: userData.User_Role_V4 || mapLegacyRole(userData.role),
+        processed_role: true
+      };
+
+      // Store the processed user in localStorage
+      localStorage.setItem('user', JSON.stringify(userWithRole));
+
       return { 
-        user: userData, 
+        user: userWithRole, 
         error: null, 
         passwordChangeRequired: false
       };
@@ -136,9 +178,16 @@ export const AuthProvider = ({ children }) => {
 
       if (fetchError) throw fetchError;
 
+      // Process the role for the updated user
+      const updatedUserWithRole = {
+        ...updatedUser,
+        role: updatedUser.User_Role_V4 || mapLegacyRole(updatedUser.role),
+        processed_role: true
+      };
+
       // Update user in state and localStorage
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUserWithRole);
+      localStorage.setItem('user', JSON.stringify(updatedUserWithRole));
       resetLogoutTimer();
 
       return { error: null };

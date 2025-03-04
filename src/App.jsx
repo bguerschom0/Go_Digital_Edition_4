@@ -24,6 +24,13 @@ import RequestAnalytics from './pages/requests/RequestAnalytics';
 // Report Pages
 import RequestReports from './pages/reports/RequestReports';
 
+// Organization Management
+import OrganizationUsers from './pages/organizations/OrganizationUsers';
+import OrganizationList from './pages/organizations/OrganizationList';
+import OrganizationDetail from './pages/organizations/OrganizationDetail';
+
+
+
 const ProtectedRoute = ({ children, requiredRoles = [] }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -70,6 +77,11 @@ const App = () => {
       
       {/* User Management routes - only for admins */}
       <Route path="/user-management" element={<ProtectedRoute requiredRoles={['admin']}><AuthenticatedLayout><UserManagement /></AuthenticatedLayout></ProtectedRoute>} />
+
+            {/* Organization management routes */}
+      <Route path="/organizations" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationList /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/organizations/:id" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationDetail /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/organization-users" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationUsers /></AuthenticatedLayout></ProtectedRoute>} />
 
 
       {/* Request routes - accessible by all authenticated users */}

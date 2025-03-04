@@ -2,7 +2,7 @@
 import { useAuth } from './useAuth';
 
 const roleAccess = {
-  admin: [
+  administrator: [
     '/admindashboard',
     '/user-management'
   ],

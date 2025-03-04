@@ -9,7 +9,6 @@ import Footer from './components/layout/Footer';
 // Pages
 import LoginPage from './pages/Login/Login';
 import UserManagement from './pages/UserManagement/UserManagement';
-import RoleManagement from './pages/UserManagement/RoleManagement';
 import Unauthorized from './pages/Unauthorized';
 
 // Dashboard Pages

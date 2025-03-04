@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import UserOrgAssignment from './UserOrgAssignment';
+import UserOrgAssignment from '../../components/organizations/UserOrgAssignment';
 
 // Utility function to validate UUID format
 const isValidUUID = (str) => {

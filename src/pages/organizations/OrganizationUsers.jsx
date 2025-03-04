@@ -76,7 +76,7 @@ const OrganizationUsers = () => {
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('*')
-        .eq('User_Role_V4', 'organization');
+        .eq('user_role_v4', 'organization');
         
       if (usersError) throw usersError;
       setOrgUsers(usersData || []);

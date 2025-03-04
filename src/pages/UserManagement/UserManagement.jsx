@@ -582,6 +582,9 @@ const UserManagement = () => {
                       Created At
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Update At
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Last Login
                     </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -617,7 +620,6 @@ const UserManagement = () => {
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {user.username}
                               </div>
-                              )}
                             </div>
                           </div>
                         </td>
@@ -642,6 +644,13 @@ const UserManagement = () => {
                               ? new Date(user.created_at).toLocaleString() 
                               : 'N/A'}
                           </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {user.updated_at 
+                              ? new Date(user.updated_at).toLocaleString() 
+                              : 'N/A'}
+                          </td>
+                        
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {user.last_login 
                             ? new Date(user.last_login).toLocaleString() 

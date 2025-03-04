@@ -48,8 +48,8 @@ export const AuthProvider = ({ children }) => {
   // Mapping from legacy roles to new roles
   const mapLegacyRole = (legacyRole) => {
     switch(legacyRole?.toLowerCase()) {
-      case 'admin':
-        return 'admin';
+      case 'administrator':
+        return 'administrator';
       case 'user':
         return 'user';
       case 'organization':

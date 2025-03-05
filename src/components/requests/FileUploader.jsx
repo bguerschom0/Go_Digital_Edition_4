@@ -184,7 +184,7 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
         
         // Record file metadata in database
         const { error: metadataError } = await supabase
-          .from('request_files')
+          .from('v4_request_files')
           .insert([
             {
               request_id: requestId,
@@ -239,7 +239,7 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
     if (isResponseUpload && uploadedCount > 0 && uploadedCount === files.length) {
       try {
         await supabase
-          .from('requests')
+          .from('v4_requests')
           .update({ 
             status: 'completed',
             completed_at: new Date().toISOString(),

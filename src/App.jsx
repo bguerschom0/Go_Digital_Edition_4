@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { getRoleBasedDashboard } from './utils/roleRoutes';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 // Layout Components
 import Header from './components/layout/Header';
@@ -28,6 +29,9 @@ import RequestReports from './pages/reports/RequestReports';
 import OrganizationUsers from './pages/organizations/OrganizationUsers';
 import OrganizationList from './pages/organizations/OrganizationList';
 import OrganizationDetail from './pages/organizations/OrganizationDetail';
+
+// Notification Pages
+import NotificationCenter from './pages/notifications/NotificationCenter';
 
 const ProtectedRoute = ({ children, requiredRoles = [] }) => {
   const { user, loading } = useAuth();
@@ -90,6 +94,10 @@ const App = () => {
       <Route path="/request-analytics" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><RequestAnalytics /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/reports/requests" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><RequestReports /></AuthenticatedLayout></ProtectedRoute>} />
 
+      {/* Notifications - for all authenticated users */}
+      <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout><NotificationCenter /></AuthenticatedLayout></ProtectedRoute>} />
+
+      
       {/* Root route redirect */}
       <Route path="/" element={<Navigate to={user ? getRoleBasedDashboard(user.role) : "/login"} replace />} />
 

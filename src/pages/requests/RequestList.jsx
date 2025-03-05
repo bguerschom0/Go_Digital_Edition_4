@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { 
   Search, 
   Plus, 
@@ -10,10 +9,9 @@ import {
   Calendar, 
   Loader2 
 } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
 import RequestCard from '../../components/requests/RequestCard';
+import { useAuth } from '../../hooks/useAuth';
 import useRoleCheck from '../../hooks/useRoleCheck';
-import { getRequests } from '../../services/requestService';
 
 const RequestList = () => {
   const { user } = useAuth();
@@ -25,8 +23,6 @@ const RequestList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [organizations, setOrganizations] = useState([]);
-  const [userOrganizations, setUserOrganizations] = useState([]);
-  const [fetchError, setFetchError] = useState(null);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -39,134 +35,55 @@ const RequestList = () => {
     priority: 'all'
   });
 
-  // Initial data fetch
+  // Fetch requests once on mount
   useEffect(() => {
-    let isMounted = true;
-    
-    const loadInitialData = async () => {
-      try {
-        setLoading(true);
-        setFetchError(null);
-        
-        // Use the requestService function instead of direct Supabase calls
-        const filters = {};
-        
-        // Add organization filters if user is restricted
-        if (isRestrictedToOrganization() && userOrganizations.length > 0) {
-          filters.organizationId = userOrganizations.map(org => org.id);
-        }
-        
-        // Get requests using the service
-        const data = await getRequests(filters);
-        
-        if (isMounted) {
-          setRequests(data || []);
-          setFilteredRequests(data || []);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Error fetching requests:', error);
-        if (isMounted) {
-          setFetchError('Failed to load requests. Please try again.');
-          setLoading(false);
-        }
-      }
-    };
-    
-    if (isRestrictedToOrganization()) {
-      // Wait for user organizations to be loaded first
-      if (userOrganizations.length > 0) {
-        loadInitialData();
-      }
-    } else {
-      loadInitialData();
-    }
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [isRestrictedToOrganization, userOrganizations]);
-  
-  // Fetch user's organizations if they're an organization user
-  useEffect(() => {
-    const fetchUserOrganizations = async () => {
-      if (!isRestrictedToOrganization() || !user) return;
-      
-      try {
-        // We're keeping this direct Supabase call since it's a one-time operation
-        const { supabase } = await import('../../config/supabase');
-        const { data, error } = await supabase
-          .from('v4_user_organizations')
-          .select(`
-            organization_id,
-            v4_organizations (id, name)
-          `)
-          .eq('user_id', user.id);
-          
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setUserOrganizations(data.map(item => ({
-            id: item.organization_id,
-            name: item.v4_organizations.name
-          })));
-        }
-      } catch (error) {
-        console.error('Error fetching user organizations:', error);
-      }
-    };
-    
-    fetchUserOrganizations();
-  }, [user, isRestrictedToOrganization]);
-  
-  // Fetch organizations for filters
-  useEffect(() => {
-    const fetchOrganizations = async () => {
+    const fetchData = async () => {
       try {
         const { supabase } = await import('../../config/supabase');
-        const { data, error } = await supabase
+        
+        // First fetch organizations
+        const { data: orgsData } = await supabase
           .from('v4_organizations')
           .select('id, name')
           .order('name');
-          
-        if (error) throw error;
-        setOrganizations(data || []);
+        
+        setOrganizations(orgsData || []);
+        
+        // Then fetch requests
+        const { data } = await supabase
+          .from('v4_requests')
+          .select(`
+            *,
+            v4_organizations:sender (name),
+            v4_request_files!v4_request_files_request_id_fkey (id),
+            v4_comments!v4_comments_request_id_fkey (id)
+          `)
+          .order('date_received', { ascending: false });
+        
+        // Process request data
+        const processedRequests = data.map(request => ({
+          ...request,
+          sender_name: request.v4_organizations?.name || 'Unknown',
+          files_count: request.v4_request_files ? request.v4_request_files.length : 0,
+          comments_count: request.v4_comments ? request.v4_comments.length : 0
+        }));
+        
+        setRequests(processedRequests);
+        setFilteredRequests(processedRequests);
       } catch (error) {
-        console.error('Error fetching organizations:', error);
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
       }
     };
-    
-    fetchOrganizations();
-  }, []);
 
-  // Manual refresh function
-  const refreshData = async () => {
-    try {
-      setLoading(true);
-      setFetchError(null);
-      
-      // Use the requestService function instead of direct Supabase calls
-      const filterParams = {};
-      
-      // Add organization filters if user is restricted
-      if (isRestrictedToOrganization() && userOrganizations.length > 0) {
-        filterParams.organizationId = userOrganizations.map(org => org.id);
-      }
-      
-      // Get requests using the service
-      const data = await getRequests(filterParams);
-      
-      setRequests(data || []);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error refreshing requests:', error);
-      setFetchError('Failed to refresh requests. Please try again.');
-      setLoading(false);
-    }
-  };
+    fetchData();
+  }, []);
 
   // Apply filters and search
   useEffect(() => {
+    if (requests.length === 0) return;
+    
     let result = [...requests];
     
     // Apply status filter
@@ -200,9 +117,9 @@ const RequestList = () => {
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       result = result.filter(request => 
-        request.reference_number.toLowerCase().includes(lowerSearchTerm) ||
-        request.subject.toLowerCase().includes(lowerSearchTerm) ||
-        request.sender_name.toLowerCase().includes(lowerSearchTerm)
+        request.reference_number?.toLowerCase().includes(lowerSearchTerm) ||
+        request.subject?.toLowerCase().includes(lowerSearchTerm) ||
+        request.sender_name?.toLowerCase().includes(lowerSearchTerm)
       );
     }
     
@@ -221,6 +138,39 @@ const RequestList = () => {
       priority: 'all'
     });
     setSearchTerm('');
+  };
+
+  // Manual refresh function
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      
+      const { supabase } = await import('../../config/supabase');
+      
+      const { data } = await supabase
+        .from('v4_requests')
+        .select(`
+          *,
+          v4_organizations:sender (name),
+          v4_request_files!v4_request_files_request_id_fkey (id),
+          v4_comments!v4_comments_request_id_fkey (id)
+        `)
+        .order('date_received', { ascending: false });
+      
+      // Process request data
+      const processedRequests = data.map(request => ({
+        ...request,
+        sender_name: request.v4_organizations?.name || 'Unknown',
+        files_count: request.v4_request_files ? request.v4_request_files.length : 0,
+        comments_count: request.v4_comments ? request.v4_comments.length : 0
+      }));
+      
+      setRequests(processedRequests);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -243,7 +193,7 @@ const RequestList = () => {
               onClick={refreshData}
               disabled={loading}
               className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
-                       hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -260,7 +210,7 @@ const RequestList = () => {
               <button
                 onClick={() => navigate('/requests/new')}
                 className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                        hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 New Request
@@ -268,16 +218,6 @@ const RequestList = () => {
             )}
           </div>
         </div>
-        
-        {/* Error message */}
-        {fetchError && (
-          <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 p-4 rounded-lg mb-6">
-            <p className="flex items-center">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              {fetchError}
-            </p>
-          </div>
-        )}
         
         {/* Search and filter bar */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
@@ -291,8 +231,8 @@ const RequestList = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                        bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                        focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
               />
             </div>
             
@@ -300,8 +240,8 @@ const RequestList = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center px-4 py-2 border border-gray-200 dark:border-gray-700
-                       rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700
-                       transition-colors"
+                      rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700
+                      transition-colors"
             >
               <Filter className="w-4 h-4 mr-2" />
               Filters
@@ -311,13 +251,7 @@ const RequestList = () => {
           
           {/* Expanded filters */}
           {showFilters && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
-            >
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Status filter */}
                 <div>
@@ -328,8 +262,8 @@ const RequestList = () => {
                     value={filters.status}
                     onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                             focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                            bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                            focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
                   >
                     <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
@@ -338,51 +272,26 @@ const RequestList = () => {
                   </select>
                 </div>
                 
-                {/* Organization filter - if not restricted to specific orgs */}
-                {!isRestrictedToOrganization() && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Organization
-                    </label>
-                    <select
-                      value={filters.organization}
-                      onChange={(e) => setFilters({ ...filters, organization: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                               focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                    >
-                      <option value="all">All Organizations</option>
-                      {organizations.map((org) => (
-                        <option key={org.id} value={org.id}>
-                          {org.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                
-                {/* Organization filter - if restricted to specific orgs */}
-                {isRestrictedToOrganization() && userOrganizations.length > 1 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Your Organizations
-                    </label>
-                    <select
-                      value={filters.organization}
-                      onChange={(e) => setFilters({ ...filters, organization: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                               focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                    >
-                      <option value="all">All Your Organizations</option>
-                      {userOrganizations.map((org) => (
-                        <option key={org.id} value={org.id}>
-                          {org.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {/* Organization filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Organization
+                  </label>
+                  <select
+                    value={filters.organization}
+                    onChange={(e) => setFilters({ ...filters, organization: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                            bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                            focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                  >
+                    <option value="all">All Organizations</option>
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 
                 {/* Date range filter */}
                 <div>
@@ -399,8 +308,8 @@ const RequestList = () => {
                         dateRange: { ...filters.dateRange, start: e.target.value }
                       })}
                       className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                               focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                              bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                              focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
                     />
                   </div>
                 </div>
@@ -419,8 +328,8 @@ const RequestList = () => {
                         dateRange: { ...filters.dateRange, end: e.target.value }
                       })}
                       className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                               focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                              bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                              focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
                     />
                   </div>
                 </div>
@@ -434,8 +343,8 @@ const RequestList = () => {
                     value={filters.priority}
                     onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                             focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                            bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                            focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
                   >
                     <option value="all">All Priorities</option>
                     <option value="low">Low</option>
@@ -451,14 +360,14 @@ const RequestList = () => {
                 <button
                   onClick={clearFilters}
                   className="flex items-center px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700
-                           text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200
-                           dark:hover:bg-gray-600 transition-colors"
+                          text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200
+                          dark:hover:bg-gray-600 transition-colors"
                 >
                   <X className="w-4 h-4 mr-1" />
                   Clear Filters
                 </button>
               </div>
-            </motion.div>
+            </div>
           )}
         </div>
         
@@ -476,18 +385,18 @@ const RequestList = () => {
               </h3>
               <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
                 {searchTerm || filters.status !== 'all' || filters.organization !== 'all' || 
-                 filters.dateRange.start || filters.dateRange.end || filters.priority !== 'all' ? (
+                filters.dateRange.start || filters.dateRange.end || filters.priority !== 'all' ? (
                   'No requests match your current filters. Try adjusting your search criteria.'
-                 ) : (
+                ) : (
                   'No document requests have been recorded yet.'
-                 )}
+                )}
               </p>
               {(searchTerm || filters.status !== 'all' || filters.organization !== 'all' || 
                 filters.dateRange.start || filters.dateRange.end || filters.priority !== 'all') && (
                 <button
                   onClick={clearFilters}
                   className="mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
-                           rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                          rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   Clear Filters
                 </button>

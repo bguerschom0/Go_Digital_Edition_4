@@ -56,7 +56,7 @@ const OrgDashboard = () => {
       
       // Fetch organization's requests count
       const { count: totalRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('sender', orgData.id);
 

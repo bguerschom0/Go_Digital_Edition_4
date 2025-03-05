@@ -1,72 +1,176 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Check, X, Loader2, AlertCircle } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  AlertCircle, 
+  Calendar, 
+  Upload,
+  Loader2
+} from 'lucide-react';
 import { supabase } from '../../config/supabase';
-import RequestForm from '../../components/requests/RequestForm';
+import { useAuth } from '../../hooks/useAuth';
 import FileUploader from '../../components/requests/FileUploader';
+import useRoleCheck from '../../hooks/useRoleCheck';
 
 const NewRequest = () => {
   const { user } = useAuth();
+  const { canProcessRequests } = useRoleCheck();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [requestData, setRequestData] = useState(null);
-  const [uploadComplete, setUploadComplete] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [organizations, setOrganizations] = useState([]);
+  const [checkingRef, setCheckingRef] = useState(false);
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [duplicateDetails, setDuplicateDetails] = useState(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    reference_number: '',
+    date_received: new Date().toISOString().split('T')[0], // Today's date
+    sender: '',
+    subject: '',
+    description: '',
+    priority: 'normal'
+  });
 
-  // Handle request form submission
-  const handleRequestSubmit = async (formData) => {
+  // Fetch organizations for dropdown
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('v4_organizations')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+          
+        if (error) throw error;
+        setOrganizations(data || []);
+        
+        // If user is from an organization, set it as default
+        if (user.role === 'organization') {
+          const { data: userOrgs, error: userOrgError } = await supabase
+            .from('v4_user_organizations')
+            .select('organization_id')
+            .eq('user_id', user.id)
+            .eq('is_primary', true)
+            .single();
+            
+          if (!userOrgError && userOrgs) {
+            setFormData(prev => ({ ...prev, sender: userOrgs.organization_id }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching organizations:', error);
+        setFormError('Failed to load organizations. Please try again.');
+      }
+    };
+    
+    fetchOrganizations();
+  }, [user]);
+
+  // Handle form input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error when user types
+    if (formError) setFormError('');
+    
+    // Check for duplicate reference number
+    if (name === 'reference_number' && value.trim()) {
+      checkDuplicateReference(value);
+    }
+  };
+
+  // Check for duplicate reference numbers
+  const checkDuplicateReference = async (reference) => {
+    setCheckingRef(true);
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Insert request into database
       const { data, error } = await supabase
-        .from('requests')
-        .insert([{
-          ...formData,
-          created_by: user.id,
-          status: 'pending',
-        }])
-        .select()
-        .single();
+        .from('v4_requests')
+        .select('id, reference_number, date_received, status')
+        .eq('reference_number', reference)
+        .limit(1);
         
       if (error) throw error;
       
-      // Store request data and move to next step
-      setRequestData(data);
-      setStep(2);
-    } catch (err) {
-      console.error('Error creating request:', err);
-      setError('Failed to create request. Please try again.');
+      setIsDuplicate(data && data.length > 0);
+      setDuplicateDetails(data && data.length > 0 ? data[0] : null);
+    } catch (error) {
+      console.error('Error checking reference number:', error);
     } finally {
+      setCheckingRef(false);
+    }
+  };
+
+  // Handle upload completion
+  const handleUploadComplete = (count) => {
+    setUploadSuccess(true);
+    setTimeout(() => {
+      navigate('/requests');
+    }, 2000);
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate form
+    if (!formData.reference_number.trim()) {
+      setFormError('Reference number is required');
+      return;
+    }
+    
+    if (!formData.sender) {
+      setFormError('Sender organization is required');
+      return;
+    }
+    
+    if (!formData.subject.trim()) {
+      setFormError('Subject is required');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Insert new request
+      const { data, error } = await supabase
+        .from('v4_requests')
+        .insert([
+          {
+            reference_number: formData.reference_number,
+            date_received: formData.date_received,
+            sender: formData.sender,
+            subject: formData.subject,
+            description: formData.description || null,
+            priority: formData.priority,
+            status: 'pending',
+            is_duplicate: isDuplicate,
+            created_by: user.id
+          }
+        ])
+        .select();
+        
+      if (error) throw error;
+      
+      // Navigate to the file upload section of the request detail
+      navigate(`/requests/${data[0].id}`);
+    } catch (error) {
+      console.error('Error creating request:', error);
+      setFormError('Failed to create request. Please try again.');
       setLoading(false);
     }
   };
 
-  // Handle file upload completion
-  const handleUploadComplete = (filesCount) => {
-    setUploadComplete(true);
-  };
-
-  // Handle completion and navigate to request detail
-  const handleComplete = () => {
-    navigate(`/requests/${requestData.id}`);
-  };
-
-  // Handle cancel and navigate back to requests list
-  const handleCancel = () => {
-    navigate('/requests');
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back button */}
         <button
-          onClick={handleCancel}
+          onClick={() => navigate('/requests')}
           className="flex items-center mb-6 text-gray-600 dark:text-gray-400 hover:text-gray-900 
                    dark:hover:text-white transition-colors"
         >
@@ -74,139 +178,197 @@ const NewRequest = () => {
           Back to Requests
         </button>
         
-        {/* Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+        >
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
             Create New Request
           </h1>
-          <p className="mt-1 text-gray-500 dark:text-gray-400">
-            Complete the form to record a new document request.
-          </p>
           
-          {/* Progress steps */}
-          <div className="mt-8 flex items-center">
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full 
-                          ${step >= 1 ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
-              1
+          {formError && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <span>{formError}</span>
             </div>
-            <div className={`h-1 flex-grow mx-2 
-                          ${step >= 2 ? 'bg-black dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full
-                          ${step >= 2 ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
-              2
-            </div>
-            <div className={`h-1 flex-grow mx-2 
-                          ${step >= 3 ? 'bg-black dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full
-                          ${step >= 3 ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
-              3
-            </div>
-          </div>
+          )}
           
-          <div className="mt-2 grid grid-cols-3 text-xs">
-            <div className="text-center">Request Details</div>
-            <div className="text-center">Upload Documents</div>
-            <div className="text-center">Complete</div>
-          </div>
-        </div>
-        
-        {/* Error message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-        
-        {/* Step 1: Request Form */}
-        {step === 1 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <RequestForm 
-              onSubmit={handleRequestSubmit}
-              onCancel={handleCancel}
-            />
-          </motion.div>
-        )}
-        
-        {/* Step 2: File Upload */}
-        {step === 2 && requestData && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow p-6"
-          >
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Upload Documents (Optional)
-            </h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Upload any relevant documents for this request. You can skip this step if no documents are available.
-            </p>
+          {uploadSuccess && (
+            <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded-lg flex items-start gap-2">
+              <Check className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <span>Request created successfully! Redirecting...</span>
+            </div>
+          )}
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Reference Number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Reference Number*
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="reference_number"
+                  value={formData.reference_number}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                  disabled={loading}
+                />
+                {checkingRef && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                  </div>
+                )}
+              </div>
+              
+              {isDuplicate && duplicateDetails && (
+                <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg text-sm">
+                  <p className="font-medium">Duplicate reference number detected</p>
+                  <p className="mt-1">
+                    This reference exists for a request received on{' '}
+                    {new Date(duplicateDetails.date_received).toLocaleDateString()}. 
+                    Current status: {duplicateDetails.status.toUpperCase()}
+                  </p>
+                  <p className="mt-1">You can continue with this reference if needed.</p>
+                </div>
+              )}
+            </div>
             
-            <FileUploader 
-              requestId={requestData.id}
-              onUploadComplete={handleUploadComplete}
-              isResponseUpload={false}
-            />
+            {/* Date Received */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Date Received*
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="date"
+                  name="date_received"
+                  value={formData.date_received}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                  disabled={loading}
+                />
+              </div>
+            </div>
             
-            <div className="flex justify-end gap-4 mt-8">
+            {/* Sender Organization */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Sender Organization*
+              </label>
+              <select
+                name="sender"
+                value={formData.sender}
+                onChange={handleChange}
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                disabled={loading || user.role === 'organization'}
+              >
+                <option value="">Select an organization</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Subject */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Subject / Request Type*
+              </label>
+              <input
+                type="text"
+                name="subject"
+                value={formData.subject}
+                onChange={handleChange}
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                disabled={loading}
+              />
+            </div>
+            
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Description (Optional)
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows="3"
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                disabled={loading}
+              />
+            </div>
+            
+            {/* Priority */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Priority
+              </label>
+              <select
+                name="priority"
+                value={formData.priority}
+                onChange={handleChange}
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                disabled={loading}
+              >
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+            
+            {/* Submit Button */}
+            <div className="flex justify-end">
               <button
-                onClick={() => setStep(3)}
+                type="submit"
                 disabled={loading}
                 className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg
-                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
+                         flex items-center gap-2 disabled:opacity-50"
               >
-                {uploadComplete ? 'Continue' : 'Skip'}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    Create Request
+                  </>
+                )}
               </button>
             </div>
-          </motion.div>
-        )}
-        
-        {/* Step 3: Completion */}
-        {step === 3 && requestData && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 text-center"
-          >
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
-                <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
-              </div>
-              
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Request Created Successfully
-              </h2>
-              
-              <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">
-                Your request has been recorded with reference number <strong>{requestData.reference_number}</strong>. You can view the request details or return to the requests list.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
-                  onClick={() => navigate('/requests')}
-                  className="px-6 py-2 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-lg 
-                           hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors order-2 sm:order-1"
-                >
-                  Return to List
-                </button>
-                
-                <button
-                  onClick={handleComplete}
-                  className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg
-                           hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors order-1 sm:order-2"
-                >
-                  View Request Details
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
+          </form>
+        </motion.div>
       </div>
     </div>
   );
 };
+
+// Missing import
+const Check = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
 
 export default NewRequest;

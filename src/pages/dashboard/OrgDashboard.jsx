@@ -62,21 +62,21 @@ const OrgDashboard = () => {
 
       // Fetch pending requests count
       const { count: pendingRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('sender', orgData.id)
         .in('status', ['pending', 'in_progress']);
 
       // Fetch completed requests count
       const { count: completedRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('sender', orgData.id)
         .eq('status', 'completed');
 
       // Fetch recent requests
       const { data: recentRequestsData } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select(`
           id,
           reference_number,

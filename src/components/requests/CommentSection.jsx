@@ -19,7 +19,7 @@ const CommentSection = ({ requestId }) => {
       try {
         setLoading(true);
         const { data, error } = await supabase
-          .from('comments')
+          .from('v4_comments')
           .select(`
             id,
             content,
@@ -30,7 +30,7 @@ const CommentSection = ({ requestId }) => {
               id,
               full_name,
               username,
-              role
+              User_Role_V4
             )
           `)
           .eq('request_id', requestId)
@@ -49,17 +49,17 @@ const CommentSection = ({ requestId }) => {
 
     // Set up real-time subscription for new comments
     const commentSubscription = supabase
-      .channel('public:comments')
+      .channel('public:v4_comments')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'comments',
+        table: 'v4_comments',
         filter: `request_id=eq.${requestId}`
       }, (payload) => {
         // Fetch the new comment with user data
         const fetchNewComment = async () => {
           const { data, error } = await supabase
-            .from('comments')
+            .from('v4_comments')
             .select(`
               id,
               content,
@@ -70,7 +70,7 @@ const CommentSection = ({ requestId }) => {
                 id,
                 full_name,
                 username,
-                role
+                User_Role_V4
               )
             `)
             .eq('id', payload.new.id)
@@ -114,14 +114,17 @@ const CommentSection = ({ requestId }) => {
     setSubmitting(true);
     
     try {
+      // Determine if comment should be internal (only for admin/user roles)
+      const isInternal = false; // Set to true if implementing internal-only comments
+
       const { error } = await supabase
-        .from('comments')
+        .from('v4_comments')
         .insert([
           {
             request_id: requestId,
             user_id: user.id,
             content: newComment.trim(),
-            is_internal: false // All comments are visible to all users
+            is_internal: isInternal
           },
         ]);
         
@@ -138,16 +141,28 @@ const CommentSection = ({ requestId }) => {
   // Get user's avatar color based on role
   const getUserAvatarColor = (role) => {
     switch(role) {
-      case 'admin':
+      case 'administrator':
         return 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300';
-      case 'processor':
+      case 'user':
         return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300';
       case 'organization':
         return 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300';
-      case 'supervisor':
-        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';
       default:
         return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    }
+  };
+
+  // Get role display name
+  const getRoleDisplayName = (role) => {
+    switch(role) {
+      case 'administrator':
+        return 'Admin';
+      case 'user':
+        return 'Staff';
+      case 'organization':
+        return 'Organization';
+      default:
+        return role;
     }
   };
 
@@ -179,7 +194,7 @@ const CommentSection = ({ requestId }) => {
                 }`}
               >
                 {comment.user_id !== user.id && (
-                  <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getUserAvatarColor(comment.users.role)}`}>
+                  <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getUserAvatarColor(comment.users.User_Role_V4)}`}>
                     <UserCircle className="h-5 w-5" />
                   </div>
                 )}
@@ -192,6 +207,11 @@ const CommentSection = ({ requestId }) => {
                   <div className="flex justify-between items-start gap-2 mb-1">
                     <span className="text-xs font-medium">
                       {comment.user_id === user.id ? 'You' : comment.users.full_name}
+                      {comment.users.User_Role_V4 && (
+                        <span className="ml-1 opacity-70">
+                          ({getRoleDisplayName(comment.users.User_Role_V4)})
+                        </span>
+                      )}
                     </span>
                     <span className="text-xs opacity-70">
                       {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}

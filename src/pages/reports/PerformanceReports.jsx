@@ -1,621 +1,381 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Download, 
-  Filter, 
-  Loader2,
-  Users,
-  Calendar,
-  Clock,
-  BarChart as BarChartIcon
-} from 'lucide-react';
 import { supabase } from '../../config/supabase';
-import { useAuth } from '../../hooks/useAuth';
-import * as XLSX from 'xlsx';
-import { format, parseISO, subMonths } from 'date-fns';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line
-} from 'recharts';
+import ReportFilters from '../../components/reports/ReportFilters';
+import ReportChart from '../../components/reports/ReportChart';
+import ReportTable from '../../components/reports/ReportTable';
+import ReportExport from '../../components/reports/ReportExport';
+import { subMonths, format } from 'date-fns';
+import { Loader2, Clock, UserCheck, FileUp, BarChart } from 'lucide-react';
 
 const PerformanceReports = () => {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState([]);
-  const [processorData, setProcessorData] = useState([]);
-  const [timelineData, setTimelineData] = useState([]);
-  
-  // Filters state
-  const [filters, setFilters] = useState({
-    dateRange: {
-      start: format(subMonths(new Date(), 3), 'yyyy-MM-dd'), // Default to 3 months
-      end: format(new Date(), 'yyyy-MM-dd')
-    },
-    processor: 'all'
+  // Default to last 3 months
+  const [dateRange, setDateRange] = useState({
+    start: format(subMonths(new Date(), 3), 'yyyy-MM-dd'),
+    end: format(new Date(), 'yyyy-MM-dd')
   });
   
-  useEffect(() => {
-    fetchPerformanceData();
-  }, [filters]);
+  // Report type filter
+  const [reportType, setReportType] = useState('response_time');
   
-  const fetchPerformanceData = async () => {
-    try {
+  // Report data
+  const [userPerformance, setUserPerformance] = useState([]);
+  const [responseTimeData, setResponseTimeData] = useState([]);
+  const [volumeData, setVolumeData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch organizations for filters
+  const [organizations, setOrganizations] = useState([]);
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      const { data, error } = await supabase
+        .from('v4_organizations')
+        .select('id, name')
+        .order('name');
+        
+      if (!error && data) {
+        setOrganizations(data);
+      }
+    };
+    
+    fetchOrganizations();
+  }, []);
+  
+  // Fetch report data based on filters
+  useEffect(() => {
+    const fetchReportData = async () => {
       setLoading(true);
       
-      // Get all processors
-      const { data: processors, error: processorError } = await supabase
-        .from('users')
-        .select('id, full_name, username')
-        .in('role', ['admin', 'processor']);
-        
-      if (processorError) throw processorError;
-      
-      // Get requests within date range
-      let requestQuery = supabase
-        .from('requests')
-        .select(`
-          *,
-          assigned_to_user:assigned_to (id, full_name, username)
-        `);
-        
-      if (filters.dateRange.start && filters.dateRange.end) {
-        requestQuery = requestQuery
-          .gte('created_at', filters.dateRange.start)
-          .lte('created_at', filters.dateRange.end);
+      try {
+        // Fetch data based on report type
+        switch (reportType) {
+          case 'response_time':
+            await fetchResponseTimeData();
+            break;
+          case 'user_performance':
+            await fetchUserPerformanceData();
+            break;
+          case 'volume_trends':
+            await fetchVolumeData();
+            break;
+          default:
+            await fetchResponseTimeData();
+        }
+      } catch (error) {
+        console.error('Error fetching report data:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      if (filters.processor !== 'all') {
-        requestQuery = requestQuery.eq('assigned_to', filters.processor);
+    };
+    
+    fetchReportData();
+  }, [dateRange, reportType]);
+  
+  // Fetch response time data
+  const fetchResponseTimeData = async () => {
+    // Average response time by priority
+    const { data: priorityData, error: priorityError } = await supabase.rpc(
+      'get_avg_response_time_by_priority',
+      { 
+        start_date: dateRange.start,
+        end_date: dateRange.end
       }
+    );
+    
+    if (priorityError) {
+      console.error('Error fetching priority response time:', priorityError);
+      return;
+    }
+    
+    // Average response time by organization
+    const { data: orgData, error: orgError } = await supabase.rpc(
+      'get_avg_response_time_by_org',
+      { 
+        start_date: dateRange.start,
+        end_date: dateRange.end
+      }
+    );
+    
+    if (orgError) {
+      console.error('Error fetching org response time:', orgError);
+      return;
+    }
+    
+    setResponseTimeData({
+      priorityData: priorityData || [],
+      orgData: orgData || []
+    });
+  };
+  
+  // Fetch user performance data
+  const fetchUserPerformanceData = async () => {
+    // Requests processed by user
+    const { data: userData, error: userError } = await supabase
+      .from('v4_requests')
+      .select(`
+        assigned_to,
+        users!assigned_to(full_name),
+        status
+      `)
+      .gte('date_received', dateRange.start)
+      .lte('date_received', dateRange.end)
+      .not('assigned_to', 'is', null);
       
-      const { data: requests, error: requestError } = await requestQuery;
+    if (userError) {
+      console.error('Error fetching user performance:', userError);
+      return;
+    }
+    
+    // Group and aggregate data
+    const userStats = {};
+    userData?.forEach(item => {
+      const userId = item.assigned_to;
+      const userName = item.users?.full_name || 'Unknown';
       
-      if (requestError) throw requestError;
-      
-      // Process processor performance metrics
-      const userPerformance = {};
-      
-      processors.forEach(processor => {
-        userPerformance[processor.id] = {
-          id: processor.id,
-          name: processor.full_name,
-          username: processor.username,
+      if (!userStats[userId]) {
+        userStats[userId] = {
+          user_id: userId,
+          name: userName,
           total: 0,
           completed: 0,
-          inProgress: 0,
           pending: 0,
-          avgResponseTime: 0,
-          totalResponseTime: 0
+          in_progress: 0
         };
-      });
+      }
       
-      // Process request data
-      requests.forEach(request => {
-        if (!request.assigned_to) return;
-        
-        const processorId = request.assigned_to;
-        
-        if (!userPerformance[processorId]) return;
-        
-        // Increment total count
-        userPerformance[processorId].total += 1;
-        
-        // Increment status counters
-        if (request.status === 'completed') {
-          userPerformance[processorId].completed += 1;
-          
-          // Calculate response time for completed requests
-          if (request.completed_at) {
-            const createdDate = new Date(request.created_at);
-            const completedDate = new Date(request.completed_at);
-            const responseTime = Math.round((completedDate - createdDate) / (1000 * 60 * 60 * 24)); // in days
-            
-            userPerformance[processorId].totalResponseTime += responseTime;
-          }
-        } else if (request.status === 'in_progress') {
-          userPerformance[processorId].inProgress += 1;
-        } else if (request.status === 'pending') {
-          userPerformance[processorId].pending += 1;
-        }
-      });
-      
-      // Calculate average response time
-      Object.values(userPerformance).forEach(user => {
-        if (user.completed > 0) {
-          user.avgResponseTime = Math.round(user.totalResponseTime / user.completed * 10) / 10; // Round to 1 decimal
-        }
-      });
-      
-      // Convert to array and sort by total
-      const userDataArray = Object.values(userPerformance)
-        .filter(user => user.total > 0) // Only include users with requests
-        .sort((a, b) => b.total - a.total);
-      
-      setUserData(userDataArray);
-      
-      // Create processor chart data
-      const topProcessors = userDataArray
-        .slice(0, 5) // Get top 5 by total
-        .map(user => ({
-          name: user.name,
-          total: user.total,
-          completed: user.completed,
-          completion_rate: user.completed > 0 ? Math.round((user.completed / user.total) * 100) : 0
-        }));
-        
-      setProcessorData(topProcessors);
-      
-      // Create timeline data - Completed requests per week
-      // Group requests by week
-      const weeklyData = {};
-      
-      requests.forEach(request => {
-        if (request.status !== 'completed' || !request.completed_at) return;
-        
-        const weekEnd = new Date(request.completed_at);
-        const weekKey = format(weekEnd, 'yyyy-MM-dd'); // Use date as key
-        
-        if (!weeklyData[weekKey]) {
-          weeklyData[weekKey] = {
-            week: format(weekEnd, 'MMM dd'),
-            count: 0,
-            avgTime: 0,
-            totalTime: 0
-          };
-        }
-        
-        weeklyData[weekKey].count += 1;
-        
-        // Calculate response time
-        const createdDate = new Date(request.created_at);
-        const completedDate = new Date(request.completed_at);
-        const responseTime = Math.round((completedDate - createdDate) / (1000 * 60 * 60 * 24)); // in days
-        
-        weeklyData[weekKey].totalTime += responseTime;
-      });
-      
-      // Calculate average response time per week
-      Object.values(weeklyData).forEach(week => {
-        if (week.count > 0) {
-          week.avgTime = Math.round(week.totalTime / week.count * 10) / 10; // Round to 1 decimal
-        }
-      });
-      
-      // Convert to array, sort by date, and get last 8 weeks
-      const timelineDataArray = Object.entries(weeklyData)
-        .sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB))
-        .map(([_, data]) => data)
-        .slice(-8); // Get last 8 weeks
-        
-      setTimelineData(timelineDataArray);
-      
-    } catch (error) {
-      console.error('Error fetching performance data:', error);
-    } finally {
-      setLoading(false);
-    }
+      userStats[userId].total += 1;
+      userStats[userId][item.status] += 1;
+    });
+    
+    // Convert to array and add completion rate
+    const userPerformanceArray = Object.values(userStats).map(user => ({
+      ...user,
+      completion_rate: user.total > 0 
+        ? Math.round((user.completed / user.total) * 100) 
+        : 0
+    }));
+    
+    // Sort by total requests
+    userPerformanceArray.sort((a, b) => b.total - a.total);
+    
+    setUserPerformance(userPerformanceArray);
   };
   
-  // Export to Excel
-  const exportToExcel = () => {
-    try {
-      // Create worksheet for user performance
-      const userWorksheet = XLSX.utils.json_to_sheet(
-        userData.map(user => ({
-          'Processor': user.name,
-          'Username': user.username,
-          'Total Requests': user.total,
-          'Completed': user.completed,
-          'In Progress': user.inProgress,
-          'Pending': user.pending,
-          'Completion Rate (%)': user.total > 0 ? Math.round((user.completed / user.total) * 100) : 0,
-          'Avg. Response Time (days)': user.avgResponseTime || 'N/A'
-        }))
-      );
-      
-      // Create workbook and add worksheet
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, userWorksheet, 'Processor Performance');
-      
-      // Generate file name with current date
-      const fileName = `performance_report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
-      
-      // Export to file
-      XLSX.writeFile(workbook, fileName);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('Failed to export data. Please try again.');
+  // Fetch volume trend data
+  const fetchVolumeData = async () => {
+    // Requests by month
+    const { data: monthlyData, error: monthlyError } = await supabase.rpc(
+      'get_requests_by_month',
+      { 
+        start_date: dateRange.start,
+        end_date: dateRange.end
+      }
+    );
+    
+    if (monthlyError) {
+      console.error('Error fetching monthly trends:', monthlyError);
+      return;
     }
+    
+    // Format data for chart
+    const formattedData = monthlyData?.map(item => ({
+      month: format(new Date(item.month), 'MMM yyyy'),
+      count: item.count
+    })) || [];
+    
+    setVolumeData(formattedData);
   };
   
-  // Custom tooltip for charts
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-md shadow-md">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm" style={{ color: entry.color || entry.fill }}>
-              {entry.name}: {entry.value}
-              {entry.name === 'Completion Rate' ? '%' : ''}
-              {entry.name === 'Avg. Response Time' ? ' days' : ''}
-            </p>
-          ))}
-        </div>
-      );
+  // Export report data
+  const handleExport = (format) => {
+    // Implementation...
+  };
+  
+  // Report title based on type
+  const getReportTitle = () => {
+    switch (reportType) {
+      case 'response_time':
+        return 'Response Time Analysis';
+      case 'user_performance':
+        return 'User Performance Analysis';
+      case 'volume_trends':
+        return 'Request Volume Trends';
+      default:
+        return 'Performance Report';
     }
-    return null;
   };
   
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Performance Reports
-              </h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Analyze processor performance and response times
-              </p>
-            </div>
-            
-            <button
-              onClick={exportToExcel}
-              disabled={loading || userData.length === 0}
-              className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                       hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export to Excel
-            </button>
-          </div>
-          
-          {/* Filters */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+        {getReportTitle()}
+      </h1>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
+        Analyze performance metrics and identify trends
+      </p>
+      
+      {/* Report Type Selector */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Report Type</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={() => setReportType('response_time')}
+            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors ${
+              reportType === 'response_time' 
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
+                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
+            }`}
           >
-            <div className="flex items-center gap-2 mb-4">
-              <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Report Filters
-              </h2>
+            <Clock className="h-5 w-5" />
+            <div className="text-left">
+              <div className="font-medium">Response Time</div>
+              <div className="text-xs">Average resolution time analysis</div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Date Range Start */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Range (Start)
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="date"
-                    value={filters.dateRange.start}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      dateRange: { ...prev.dateRange, start: e.target.value }
-                    }))}
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                             focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                  />
-                </div>
-              </div>
-              
-              {/* Date Range End */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Range (End)
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="date"
-                    value={filters.dateRange.end}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      dateRange: { ...prev.dateRange, end: e.target.value }
-                    }))}
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                             focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                  />
-                </div>
-              </div>
-              
-              {/* Processor filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Processor
-                </label>
-                <select
-                  value={filters.processor}
-                  onChange={(e) => setFilters(prev => ({ ...prev, processor: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                           focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                >
-                  <option value="all">All Processors</option>
-                  {userData.map((processor) => (
-                    <option key={processor.id} value={processor.id}>
-                      {processor.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </motion.div>
+          </button>
           
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-              <span className="ml-2 text-gray-500 dark:text-gray-400">Loading performance data...</span>
+          <button
+            onClick={() => setReportType('user_performance')}
+            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors ${
+              reportType === 'user_performance' 
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
+                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            <UserCheck className="h-5 w-5" />
+            <div className="text-left">
+              <div className="font-medium">User Performance</div>
+              <div className="text-xs">Request processing by user</div>
             </div>
-          ) : (
-            <>
-              {/* Performance Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Total Processors */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Active Processors
-                    </h3>
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                      <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                  </div>
-                  <p className="mt-4 text-3xl font-bold text-gray-900 dark:text-white">
-                    {userData.length}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Processors who handled requests
-                  </p>
-                </motion.div>
-                
-                {/* Average Completion Rate */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Avg. Completion Rate
-                    </h3>
-                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
-                      <BarChartIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    </div>
-                  </div>
-                  <p className="mt-4 text-3xl font-bold text-gray-900 dark:text-white">
-                    {(() => {
-                      const totalRequests = userData.reduce((sum, user) => sum + user.total, 0);
-                      const totalCompleted = userData.reduce((sum, user) => sum + user.completed, 0);
-                      return totalRequests > 0 ? `${Math.round((totalCompleted / totalRequests) * 100)}%` : 'N/A';
-                    })()}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Average across all processors
-                  </p>
-                </motion.div>
-                
-                {/* Average Response Time */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Avg. Response Time
-                    </h3>
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full">
-                      <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                  </div>
-                  <p className="mt-4 text-3xl font-bold text-gray-900 dark:text-white">
-                    {(() => {
-                      const totalTime = userData.reduce((sum, user) => sum + (user.avgResponseTime * user.completed || 0), 0);
-                      const totalCompleted = userData.reduce((sum, user) => sum + user.completed, 0);
-                      return totalCompleted > 0 ? `${(totalTime / totalCompleted).toFixed(1)} days` : 'N/A';
-                    })()}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Average time to complete requests
-                  </p>
-                </motion.div>
-              </div>
-              
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Processor Performance Chart */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Top Processor Performance
-                  </h3>
-                  
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={processorData}
-                        margin={{ top: 10, right: 30, left: 0, bottom: 40 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" />
-                        <YAxis />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend />
-                        <Bar dataKey="total" name="Total Requests" fill="#8884d8" />
-                        <Bar dataKey="completed" name="Completed" fill="#82ca9d" />
-                        <Bar dataKey="completion_rate" name="Completion Rate" fill="#ffc658" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </motion.div>
-                
-                {/* Response Time Trend */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Response Time Trend
-                  </h3>
-                  
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={timelineData}
-                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="week" />
-                        <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                        <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend />
-                        <Line
-                          yAxisId="left"
-                          type="monotone"
-                          dataKey="count"
-                          name="Completed Requests"
-                          stroke="#8884d8"
-                          activeDot={{ r: 8 }}
-                        />
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="avgTime"
-                          name="Avg. Response Time"
-                          stroke="#82ca9d"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </motion.div>
-              </div>
-              
-              {/* Processor Table */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden"
-              >
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Processor Performance Details
-                  </h3>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Processor
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Total Requests
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Completed
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          In Progress
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Pending
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Completion Rate
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Avg. Response Time
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {userData.map((processor) => (
-                        <tr key={processor.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div>
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {processor.name}
-                                </div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                  {processor.username}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {processor.total}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {processor.completed}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {processor.inProgress}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {processor.pending}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                                <div 
-                                  className="bg-green-600 h-2.5 rounded-full" 
-                                  style={{ width: `${processor.total > 0 ? (processor.completed / processor.total) * 100 : 0}%` }}
-                                ></div>
-                              </div>
-                              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                                {processor.total > 0 ? Math.round((processor.completed / processor.total) * 100) : 0}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {processor.avgResponseTime > 0 ? `${processor.avgResponseTime} days` : 'N/A'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </motion.div>
-            </>
-          )}
+          </button>
+          
+          <button
+            onClick={() => setReportType('volume_trends')}
+            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors ${
+              reportType === 'volume_trends' 
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
+                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            <BarChart className="h-5 w-5" />
+            <div className="text-left">
+              <div className="font-medium">Volume Trends</div>
+              <div className="text-xs">Request volume over time</div>
+            </div>
+          </button>
         </div>
       </div>
+      
+      {/* Filters */}
+      <ReportFilters 
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        organizations={organizations}
+      />
+      
+      {/* Report Content */}
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      ) : (
+        <div className="space-y-8 mt-6">
+          {reportType === 'response_time' && responseTimeData && (
+            <>
+              {/* Response Time by Priority */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+                  Average Response Time by Priority
+                </h2>
+                <div className="h-64">
+                  <ReportChart 
+                    type="bar" 
+                    data={responseTimeData.priorityData} 
+                    dataKey="avg_days" 
+                    nameKey="priority"
+                    xAxisLabel="Priority"
+                    yAxisLabel="Average Days"
+                    colors={['#0088FE', '#00C49F', '#FFBB28', '#FF8042']}
+                  />
+                </div>
+              </div>
+              
+              {/* Response Time by Organization */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+                  Average Response Time by Organization
+                </h2>
+                <div className="h-80">
+                  <ReportChart 
+                    type="bar" 
+                    data={responseTimeData.orgData} 
+                    dataKey="avg_days" 
+                    nameKey="name"
+                    layout="vertical"
+                    xAxisLabel="Average Days"
+                    yAxisLabel="Organization"
+                    colors={['#8884d8']}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          
+          {reportType === 'user_performance' && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+                User Performance Metrics
+              </h2>
+              <ReportTable
+                data={userPerformance}
+                columns={[
+                  { Header: 'User', accessor: 'name' },
+                  { Header: 'Total Requests', accessor: 'total' },
+                  { Header: 'Completed', accessor: 'completed' },
+                  { 
+                    Header: 'Completion Rate', 
+                    accessor: 'completion_rate',
+                    Cell: ({ value }) => `${value}%` 
+                  },
+                  { Header: 'Pending', accessor: 'pending' },
+                  { Header: 'In Progress', accessor: 'in_progress' }
+                ]}
+              />
+            </div>
+          )}
+          
+          {reportType === 'volume_trends' && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+                Request Volume by Month
+              </h2>
+              <div className="h-64">
+                <ReportChart 
+                  type="line" 
+                  data={volumeData} 
+                  dataKey="count" 
+                  nameKey="month"
+                  xAxisLabel="Month"
+                  yAxisLabel="Number of Requests"
+                  colors={['#0088FE']}
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* Export Button */}
+          <div className="flex justify-end mt-6">
+            <ReportExport 
+              onExport={handleExport} 
+              data={{
+                reportType,
+                responseTimeData,
+                userPerformance,
+                volumeData
+              }}
+              filename={`performance_report_${format(new Date(), 'yyyy-MM-dd')}`}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

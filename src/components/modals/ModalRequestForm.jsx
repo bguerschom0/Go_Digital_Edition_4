@@ -5,7 +5,7 @@ import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import RequestForm from '../requests/RequestForm';
 
-const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-5xl' }) => {
+const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-4xl' }) => {
   // Handle click outside modal
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -33,20 +33,20 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-5xl' }) => 
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                 {title}
               </h2>
               <button
                 onClick={onClose}
                 className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
-                <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </button>
             </div>
             
             {/* Content */}
-            <div className="p-6">
+            <div className="p-4">
               {children}
             </div>
           </motion.div>
@@ -96,10 +96,10 @@ const ModalRequestForm = ({ isOpen, onClose, onSuccess }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Request" maxWidth="max-w-6xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Create New Request" maxWidth="max-w-3xl">
       {error && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg flex items-start gap-2">
-          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+        <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg flex items-start gap-2 text-xs">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -109,7 +109,7 @@ const ModalRequestForm = ({ isOpen, onClose, onSuccess }) => {
           onSubmit={handleSubmit} 
           onCancel={onClose} 
           isSubmitting={loading}
-          layoutType="compact" 
+          layoutType="very-compact" 
         />
       </div>
     </Modal>

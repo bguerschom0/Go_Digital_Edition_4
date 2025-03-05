@@ -5,7 +5,7 @@ import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import RequestForm from '../requests/RequestForm';
 
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-5xl' }) => {
   // Handle click outside modal
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -29,7 +29,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 50, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-auto"
+            className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full ${maxWidth} max-h-[90vh] overflow-auto`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -96,7 +96,7 @@ const ModalRequestForm = ({ isOpen, onClose, onSuccess }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Request">
+    <Modal isOpen={isOpen} onClose={onClose} title="Create New Request" maxWidth="max-w-6xl">
       {error && (
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg flex items-start gap-2">
           <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
@@ -104,11 +104,14 @@ const ModalRequestForm = ({ isOpen, onClose, onSuccess }) => {
         </div>
       )}
       
-      <RequestForm 
-        onSubmit={handleSubmit} 
-        onCancel={onClose} 
-        isSubmitting={loading} 
-      />
+      <div className="max-w-full">
+        <RequestForm 
+          onSubmit={handleSubmit} 
+          onCancel={onClose} 
+          isSubmitting={loading}
+          layoutType="compact" 
+        />
+      </div>
     </Modal>
   );
 };

@@ -1,145 +1,167 @@
-import { useState } from 'react';
-import { 
-  createRequest, 
-  getRequestById, 
-  updateRequest,
-  completeRequest,
-  getRequests,
-  deleteRequest,
-  assignRequest
-} from '../services/requestService';
-import { useAuth } from './useAuth';
+import { useState, useEffect } from 'react';
+import reportService from '../services/reportService';
+import { subMonths, format } from 'date-fns';
 
-const useRequest = () => {
-  const { user } = useAuth();
+/**
+ * Custom hook for fetching and manipulating report data
+ * @param {Object} initialFilters - Initial filter values
+ * @returns {Object} - Report data and functions
+ */
+const useReports = (initialFilters = {}) => {
+  // Default filters - last 6 months, all organizations
+  const defaultFilters = {
+    dateRange: {
+      start: format(subMonths(new Date(), 6), 'yyyy-MM-dd'),
+      end: format(new Date(), 'yyyy-MM-dd')
+    },
+    organization: 'all',
+    groupBy: 'status',
+    reportType: 'requests'
+  };
+
+  // Merge default filters with provided initial filters
+  const mergedFilters = { ...defaultFilters, ...initialFilters };
+  
+  const [filters, setFilters] = useState(mergedFilters);
+  const [statusData, setStatusData] = useState([]);
+  const [orgData, setOrgData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [responseTimeData, setResponseTimeData] = useState([]);
+  const [userActivityData, setUserActivityData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Create a new request
-  const createNewRequest = async (requestData) => {
+  /**
+   * Fetch report data based on current filters
+   */
+  const fetchReportData = async () => {
     setLoading(true);
     setError(null);
+    
     try {
-      const completeData = {
-        ...requestData,
-        created_by: user.id,
-        status: 'pending'
-      };
-      const result = await createRequest(completeData);
-      return result;
-    } catch (err) {
-      setError(err.message || 'Failed to create request');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Get request by ID
-  const fetchRequest = async (requestId) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getRequestById(requestId);
-      return result;
-    } catch (err) {
-      setError(err.message || 'Failed to fetch request');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update request
-  const updateRequestDetails = async (requestId, updateData) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const fullUpdateData = {
-        ...updateData,
-        updated_by: user.id,
-        updated_at: new Date().toISOString()
-      };
-      const result = await updateRequest(requestId, fullUpdateData);
-      return result;
-    } catch (err) {
-      setError(err.message || 'Failed to update request');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Mark request as complete
-  const markRequestComplete = async (requestId) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await completeRequest(requestId, user.id);
-      return result;
-    } catch (err) {
-      setError(err.message || 'Failed to complete request');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch requests with filters
-  const fetchRequests = async (filters = {}) => {
-    setLoading(true);
-    setError(null);
-    try {
-      // For organization users, add their organization to filters
-      if (user.role === 'organization') {
-        // We need to fetch the user's organization first
-        const { data: userData } = await supabase
-          .from('v4_user_organizations')
-          .select('organization_id')
-          .eq('user_id', user.id)
-          .eq('is_primary', true)
-          .single();
-        
-        if (userData) {
-          filters.organizationId = userData.organization_id;
-        }
-      }
+      const { dateRange, organization, groupBy, reportType } = filters;
       
-      const result = await getRequests(filters);
-      return result;
+      // Status distribution
+      const statusDistribution = await reportService.getStatusDistribution(
+        dateRange.start,
+        dateRange.end,
+        organization
+      );
+      setStatusData(statusDistribution);
+      
+      // Organization distribution
+      const orgDistribution = await reportService.getRequestsByOrganization(
+        dateRange.start,
+        dateRange.end
+      );
+      setOrgData(orgDistribution);
+      
+      // Monthly trends
+      const trends = await reportService.getMonthlyTrends(
+        dateRange.start,
+        dateRange.end,
+        organization
+      );
+      setMonthlyData(trends);
+      
+      // Only fetch response time data for performance reports
+      if (reportType === 'performance') {
+        const responseTime = await reportService.getResponseTimeData(
+          dateRange.start,
+          dateRange.end,
+          groupBy
+        );
+        setResponseTimeData(responseTime);
+        
+        const userActivity = await reportService.getUserActivityData(
+          dateRange.start,
+          dateRange.end
+        );
+        setUserActivityData(userActivity);
+      }
     } catch (err) {
-      setError(err.message || 'Failed to fetch requests');
-      throw err;
+      console.error('Error fetching report data:', err);
+      setError('Failed to fetch report data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Assign request to user
-  const assignRequestToUser = async (requestId, assignToUserId) => {
-    setLoading(true);
-    setError(null);
+  /**
+   * Update a single filter value
+   * @param {string} key - Filter key to update
+   * @param {any} value - New filter value
+   */
+  const updateFilter = (key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  /**
+   * Update date range filter
+   * @param {Object} dateRange - Object with start and end dates
+   */
+  const updateDateRange = (dateRange) => {
+    setFilters(prev => ({
+      ...prev,
+      dateRange
+    }));
+  };
+
+  /**
+   * Reset filters to default values
+   */
+  const resetFilters = () => {
+    setFilters(defaultFilters);
+  };
+
+  /**
+   * Export report data to Excel
+   * @param {string} filename - Base filename without extension
+   */
+  const exportToExcel = (filename = 'report') => {
     try {
-      const result = await assignRequest(requestId, assignToUserId, user.id);
-      return result;
+      const reportData = {
+        statusData,
+        orgData,
+        monthlyData,
+        responseTimeData,
+        userActivityData
+      };
+      
+      reportService.exportToExcel(reportData, filename);
     } catch (err) {
-      setError(err.message || 'Failed to assign request');
-      throw err;
-    } finally {
-      setLoading(false);
+      setError('Failed to export data. Please try again.');
     }
   };
+
+  // Fetch data when filters change
+  useEffect(() => {
+    fetchReportData();
+  }, [filters]);
 
   return {
+    // Data
+    statusData,
+    orgData,
+    monthlyData,
+    responseTimeData,
+    userActivityData,
+    
+    // State
     loading,
     error,
-    createNewRequest,
-    fetchRequest,
-    updateRequestDetails,
-    markRequestComplete,
-    fetchRequests,
-    assignRequestToUser
+    filters,
+    
+    // Actions
+    updateFilter,
+    updateDateRange,
+    resetFilters,
+    refreshData: fetchReportData,
+    exportToExcel
   };
 };
 
-export default useRequest;
+export default useReports;

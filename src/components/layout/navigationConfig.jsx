@@ -60,6 +60,7 @@ export const roleBasedNavigation = {
         }
       ]
     },
+    {
       name: 'Dashboards',
       path: '',
       icon: LayoutDashboard,

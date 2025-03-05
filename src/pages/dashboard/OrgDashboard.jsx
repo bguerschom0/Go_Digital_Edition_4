@@ -45,7 +45,7 @@ const OrgDashboard = () => {
       
       // Get organization details
       const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
+        .from('v4_organizations')
         .select('*')
         .eq('name', userData.organization)
         .single();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -217,11 +217,21 @@ const RequestList = () => {
     setSearchTerm('');
   };
 
-  // Debug the state
+  // Debug the state - with less noise
   useEffect(() => {
-    console.log('Requests count:', requests.length);
-    console.log('Filtered count:', filteredRequests.length);
-    console.log('Loading state:', loading);
+    // Only log if something substantial changed
+    const shouldLog = 
+      requests.length > 0 || 
+      filteredRequests.length > 0 || 
+      loading === false;
+      
+    if (shouldLog) {
+      console.log('State update:', {
+        requests: requests.length,
+        filtered: filteredRequests.length,
+        loading
+      });
+    }
   }, [requests, filteredRequests, loading]);
 
   return (

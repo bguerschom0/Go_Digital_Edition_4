@@ -71,8 +71,12 @@ const RequestList = () => {
 
   // Fetch all requests
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchRequests = async () => {
       try {
+        if (!isMounted) return;
+        
         setLoading(true);
         
         let query = supabase
@@ -95,6 +99,8 @@ const RequestList = () => {
         
         if (error) throw error;
         
+        if (!isMounted) return;
+        
         // Process request data
         const processedRequests = data.map(request => ({
           ...request,
@@ -108,12 +114,16 @@ const RequestList = () => {
       } catch (error) {
         console.error('Error fetching requests:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     
     // Fetch organizations for filters
     const fetchOrganizations = async () => {
+      if (!isMounted) return;
+      
       try {
         const { data, error } = await supabase
           .from('v4_organizations')
@@ -121,7 +131,10 @@ const RequestList = () => {
           .order('name');
           
         if (error) throw error;
-        setOrganizations(data || []);
+        
+        if (isMounted) {
+          setOrganizations(data || []);
+        }
       } catch (error) {
         console.error('Error fetching organizations:', error);
       }
@@ -130,20 +143,96 @@ const RequestList = () => {
     fetchRequests();
     fetchOrganizations();
 
-    // Set up real-time subscription for new requests
+    // Set up real-time subscription for request changes
     const requestSubscription = supabase
-      .channel('public:v4_requests')
+      .channel('public:v4_requests_changes')
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'INSERT', 
         schema: 'public', 
         table: 'v4_requests'
-      }, () => {
-        // Refetch requests when changes occur
-        fetchRequests();
+      }, (payload) => {
+        if (!isMounted) return;
+        
+        // For new requests, fetch the complete record with relations
+        supabase
+          .from('v4_requests')
+          .select(`
+            *,
+            v4_organizations:sender (name),
+            v4_request_files!v4_request_files_request_id_fkey (id),
+            v4_comments!v4_comments_request_id_fkey (id)
+          `)
+          .eq('id', payload.new.id)
+          .single()
+          .then(({ data, error }) => {
+            if (!isMounted) return;
+            
+            if (!error && data) {
+              const newRequest = {
+                ...data,
+                sender_name: data.v4_organizations?.name || 'Unknown',
+                files_count: data.v4_request_files ? data.v4_request_files.length : 0,
+                comments_count: data.v4_comments ? data.v4_comments.length : 0
+              };
+              
+              setRequests(prev => [newRequest, ...prev]);
+            }
+          });
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'v4_requests'
+      }, (payload) => {
+        if (!isMounted) return;
+        
+        // For updates, fetch the complete updated record
+        supabase
+          .from('v4_requests')
+          .select(`
+            *,
+            v4_organizations:sender (name),
+            v4_request_files!v4_request_files_request_id_fkey (id),
+            v4_comments!v4_comments_request_id_fkey (id)
+          `)
+          .eq('id', payload.new.id)
+          .single()
+          .then(({ data, error }) => {
+            if (!isMounted) return;
+            
+            if (!error && data) {
+              const updatedRequest = {
+                ...data,
+                sender_name: data.v4_organizations?.name || 'Unknown',
+                files_count: data.v4_request_files ? data.v4_request_files.length : 0,
+                comments_count: data.v4_comments ? data.v4_comments.length : 0
+              };
+              
+              setRequests(prev => 
+                prev.map(request => 
+                  request.id === updatedRequest.id ? updatedRequest : request
+                )
+              );
+            }
+          });
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'v4_requests'
+      }, (payload) => {
+        if (!isMounted) return;
+        
+        // For deletions, remove from state
+        setRequests(prev => 
+          prev.filter(request => request.id !== payload.old.id)
+        );
       })
       .subscribe();
 
+    // Cleanup function
     return () => {
+      isMounted = false;
       supabase.removeChannel(requestSubscription);
     };
   }, [isRestrictedToOrganization, userOrganizations]);
@@ -205,6 +294,13 @@ const RequestList = () => {
     });
     setSearchTerm('');
   };
+
+  // Debug the state
+  useEffect(() => {
+    console.log('Requests count:', requests.length);
+    console.log('Filtered count:', filteredRequests.length);
+    console.log('Loading state:', loading);
+  }, [requests, filteredRequests, loading]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">

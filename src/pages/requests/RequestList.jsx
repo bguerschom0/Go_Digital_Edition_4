@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -10,11 +10,10 @@ import {
   Calendar, 
   Loader2 
 } from 'lucide-react';
-import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import RequestCard from '../../components/requests/RequestCard';
 import useRoleCheck from '../../hooks/useRoleCheck';
-import { format } from 'date-fns';
+import { getRequests } from '../../services/requestService';
 
 const RequestList = () => {
   const { user } = useAuth();
@@ -27,6 +26,7 @@ const RequestList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [organizations, setOrganizations] = useState([]);
   const [userOrganizations, setUserOrganizations] = useState([]);
+  const [fetchError, setFetchError] = useState(null);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -39,125 +39,131 @@ const RequestList = () => {
     priority: 'all'
   });
 
-  // Fetch user's organizations if they're an organization user
-  useEffect(() => {
-    const fetchUserOrganizations = async () => {
-      if (isRestrictedToOrganization() && user) {
-        try {
-          const { data, error } = await supabase
-            .from('v4_user_organizations')
-            .select(`
-              organization_id,
-              v4_organizations (id, name)
-            `)
-            .eq('user_id', user.id);
-            
-          if (error) throw error;
-          
-          if (data && data.length > 0) {
-            setUserOrganizations(data.map(item => ({
-              id: item.organization_id,
-              name: item.v4_organizations.name
-            })));
-          }
-        } catch (error) {
-          console.error('Error fetching user organizations:', error);
-        }
-      }
-    };
-    
-    fetchUserOrganizations();
-  }, [user, isRestrictedToOrganization]);
-
-  // Fetch all requests
+  // Initial data fetch
   useEffect(() => {
     let isMounted = true;
     
-    const fetchRequests = async () => {
+    const loadInitialData = async () => {
       try {
-        if (!isMounted) return;
-        
         setLoading(true);
+        setFetchError(null);
         
-        let query = supabase
-          .from('v4_requests')
-          .select(`
-            *,
-            v4_organizations:sender (name),
-            v4_request_files!v4_request_files_request_id_fkey (id),
-            v4_comments!v4_comments_request_id_fkey (id)
-          `)
-          .order('date_received', { ascending: false });
-          
-        // Apply organization filter for organization users
+        // Use the requestService function instead of direct Supabase calls
+        const filters = {};
+        
+        // Add organization filters if user is restricted
         if (isRestrictedToOrganization() && userOrganizations.length > 0) {
-          const orgIds = userOrganizations.map(org => org.id);
-          query = query.in('sender', orgIds);
+          filters.organizationId = userOrganizations.map(org => org.id);
         }
         
-        const { data, error } = await query;
+        // Get requests using the service
+        const data = await getRequests(filters);
         
-        if (error) throw error;
-        
-        if (!isMounted) return;
-        
-        // Process request data
-        const processedRequests = data.map(request => ({
-          ...request,
-          sender_name: request.v4_organizations?.name || 'Unknown',
-          files_count: request.v4_request_files ? request.v4_request_files.length : 0,
-          comments_count: request.v4_comments ? request.v4_comments.length : 0
-        }));
-        
-        setRequests(processedRequests);
-        setFilteredRequests(processedRequests);
+        if (isMounted) {
+          setRequests(data || []);
+          setFilteredRequests(data || []);
+          setLoading(false);
+        }
       } catch (error) {
         console.error('Error fetching requests:', error);
-      } finally {
         if (isMounted) {
+          setFetchError('Failed to load requests. Please try again.');
           setLoading(false);
         }
       }
     };
     
-    // Fetch organizations for filters
-    const fetchOrganizations = async () => {
-      if (!isMounted) return;
+    if (isRestrictedToOrganization()) {
+      // Wait for user organizations to be loaded first
+      if (userOrganizations.length > 0) {
+        loadInitialData();
+      }
+    } else {
+      loadInitialData();
+    }
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [isRestrictedToOrganization, userOrganizations]);
+  
+  // Fetch user's organizations if they're an organization user
+  useEffect(() => {
+    const fetchUserOrganizations = async () => {
+      if (!isRestrictedToOrganization() || !user) return;
       
       try {
+        // We're keeping this direct Supabase call since it's a one-time operation
+        const { supabase } = await import('../../config/supabase');
+        const { data, error } = await supabase
+          .from('v4_user_organizations')
+          .select(`
+            organization_id,
+            v4_organizations (id, name)
+          `)
+          .eq('user_id', user.id);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setUserOrganizations(data.map(item => ({
+            id: item.organization_id,
+            name: item.v4_organizations.name
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching user organizations:', error);
+      }
+    };
+    
+    fetchUserOrganizations();
+  }, [user, isRestrictedToOrganization]);
+  
+  // Fetch organizations for filters
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      try {
+        const { supabase } = await import('../../config/supabase');
         const { data, error } = await supabase
           .from('v4_organizations')
           .select('id, name')
           .order('name');
           
         if (error) throw error;
-        
-        if (isMounted) {
-          setOrganizations(data || []);
-        }
+        setOrganizations(data || []);
       } catch (error) {
         console.error('Error fetching organizations:', error);
       }
     };
-
-    fetchRequests();
+    
     fetchOrganizations();
+  }, []);
 
-        // Set up a refresh interval instead of real-time subscription
-    // This will refresh the data every 30 seconds
-    const refreshInterval = setInterval(() => {
-      if (isMounted) {
-        console.log('Auto-refreshing requests data');
-        fetchRequests();
+  // Manual refresh function
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      setFetchError(null);
+      
+      // Use the requestService function instead of direct Supabase calls
+      const filterParams = {};
+      
+      // Add organization filters if user is restricted
+      if (isRestrictedToOrganization() && userOrganizations.length > 0) {
+        filterParams.organizationId = userOrganizations.map(org => org.id);
       }
-    }, 30000);
-
-    // Cleanup function
-    return () => {
-      isMounted = false;
-      clearInterval(refreshInterval);
-    };
-  }, [isRestrictedToOrganization, userOrganizations]);
+      
+      // Get requests using the service
+      const data = await getRequests(filterParams);
+      
+      setRequests(data || []);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error refreshing requests:', error);
+      setFetchError('Failed to refresh requests. Please try again.');
+      setLoading(false);
+    }
+  };
 
   // Apply filters and search
   useEffect(() => {
@@ -217,23 +223,6 @@ const RequestList = () => {
     setSearchTerm('');
   };
 
-  // Debug the state - with less noise
-  useEffect(() => {
-    // Only log if something substantial changed
-    const shouldLog = 
-      requests.length > 0 || 
-      filteredRequests.length > 0 || 
-      loading === false;
-      
-    if (shouldLog) {
-      console.log('State update:', {
-        requests: requests.length,
-        filtered: filteredRequests.length,
-        loading
-      });
-    }
-  }, [requests, filteredRequests, loading]);
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -248,18 +237,47 @@ const RequestList = () => {
             </p>
           </div>
           
-          {/* Only show "New Request" button for admin and user roles */}
-          {canProcessRequests() && (
+          <div className="flex gap-2">
+            {/* Refresh button */}
             <button
-              onClick={() => navigate('/requests/new')}
-              className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                       hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+              onClick={refreshData}
+              disabled={loading}
+              className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
+                       hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              New Request
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+              Refresh
             </button>
-          )}
+            
+            {/* Only show "New Request" button for admin and user roles */}
+            {canProcessRequests() && (
+              <button
+                onClick={() => navigate('/requests/new')}
+                className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
+                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Request
+              </button>
+            )}
+          </div>
         </div>
+        
+        {/* Error message */}
+        {fetchError && (
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 p-4 rounded-lg mb-6">
+            <p className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              {fetchError}
+            </p>
+          </div>
+        )}
         
         {/* Search and filter bar */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">

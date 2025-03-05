@@ -33,27 +33,27 @@ const UserDashboard = () => {
 
       // Fetch assigned requests count
       const { count: assignedRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('assigned_to', user.id);
 
       // Fetch pending requests count
       const { count: pendingRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('assigned_to', user.id)
         .in('status', ['pending', 'in_progress']);
 
       // Fetch completed requests count
       const { count: completedRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('assigned_to', user.id)
         .eq('status', 'completed');
 
       // Fetch recent assigned requests
       const { data: recentRequestsData } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select(`
           id,
           reference_number,

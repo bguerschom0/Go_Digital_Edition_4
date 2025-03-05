@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Calendar } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -90,19 +90,19 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
     const newErrors = {};
     
     if (!formData.reference_number.trim()) {
-      newErrors.reference_number = 'Reference number is required';
+      newErrors.reference_number = layoutType === "very-compact" ? 'Required' : 'Reference number is required';
     }
     
     if (!formData.date_received) {
-      newErrors.date_received = 'Received date is required';
+      newErrors.date_received = layoutType === "very-compact" ? 'Required' : 'Received date is required';
     }
     
     if (!formData.sender) {
-      newErrors.sender = 'Sender organization is required';
+      newErrors.sender = layoutType === "very-compact" ? 'Required' : 'Sender organization is required';
     }
     
     if (!formData.subject.trim()) {
-      newErrors.subject = 'Subject is required';
+      newErrors.subject = layoutType === "very-compact" ? 'Required' : 'Subject is required';
     }
     
     setErrors(newErrors);
@@ -130,6 +130,404 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
     }
   };
 
+  // Very Compact Layout
+  if (layoutType === "very-compact") {
+    return (
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Row 1: Ref Number, Date, Organization */}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Reference Number */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Reference Number*
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                name="reference_number"
+                value={formData.reference_number}
+                onChange={handleChange}
+                className={`w-full px-2 py-1 text-sm rounded border ${
+                  errors.reference_number
+                    ? 'border-red-500 dark:border-red-500'
+                    : 'border-gray-200 dark:border-gray-700'
+                } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white`}
+              />
+              {checkingRef && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                </div>
+              )}
+            </div>
+            {errors.reference_number && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.reference_number}
+              </p>
+            )}
+          </div>
+          
+          {/* Date Received */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Date Received*
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+              <input
+                type="date"
+                name="date_received"
+                value={formData.date_received}
+                onChange={handleChange}
+                className={`w-full pl-7 pr-2 py-1 text-sm rounded border ${
+                  errors.date_received
+                    ? 'border-red-500 dark:border-red-500'
+                    : 'border-gray-200 dark:border-gray-700'
+                } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white`}
+              />
+            </div>
+            {errors.date_received && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.date_received}
+              </p>
+            )}
+          </div>
+          
+          {/* Sender Organization */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Sender Organization*
+            </label>
+            <select
+              name="sender"
+              value={formData.sender}
+              onChange={handleChange}
+              className={`w-full px-2 py-1 text-sm rounded border ${
+                errors.sender
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-200 dark:border-gray-700'
+              } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+              focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white`}
+            >
+              <option value="">Select organization</option>
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+            {errors.sender && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.sender}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {/* Row 2: Subject, Priority, Buttons */}
+        <div className="grid grid-cols-12 gap-3 items-end">
+          {/* Subject */}
+          <div className="col-span-6">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Subject / Request Type*
+            </label>
+            <input
+              type="text"
+              name="subject"
+              value={formData.subject}
+              onChange={handleChange}
+              className={`w-full px-2 py-1 text-sm rounded border ${
+                errors.subject
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-200 dark:border-gray-700'
+              } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+              focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white`}
+            />
+            {errors.subject && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.subject}
+              </p>
+            )}
+          </div>
+          
+          {/* Priority */}
+          <div className="col-span-3">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Priority
+            </label>
+            <select
+              name="priority"
+              value={formData.priority}
+              onChange={handleChange}
+              className="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                       bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+            >
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          
+          {/* Buttons */}
+          <div className="col-span-3 flex gap-1 justify-end">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 
+                       dark:hover:text-white transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-3 py-1 text-sm bg-black dark:bg-white text-white dark:text-black rounded
+                       hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
+                       flex items-center gap-1 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create'
+              )}
+            </button>
+          </div>
+        </div>
+        
+        {/* Row 3: Description */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Description
+          </label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows="2"
+            className="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+          />
+        </div>
+        
+        {/* Duplicate warning (if needed) */}
+        {isDuplicate && duplicateDetails && (
+          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded text-xs">
+            <p className="font-medium">Duplicate reference detected for request from {new Date(duplicateDetails.date_received).toLocaleDateString()} (Status: {duplicateDetails.status.toUpperCase()})</p>
+          </div>
+        )}
+      </form>
+    );
+  }
+  
+  // Compact Layout
+  if (layoutType === "compact") {
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Row 1: Ref Number, Date, Organization */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Reference Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Reference Number*
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                name="reference_number"
+                value={formData.reference_number}
+                onChange={handleChange}
+                className={`w-full px-4 py-2 rounded-lg border ${
+                  errors.reference_number
+                    ? 'border-red-500 dark:border-red-500'
+                    : 'border-gray-200 dark:border-gray-700'
+                } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
+              />
+              {checkingRef && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                </div>
+              )}
+            </div>
+            {errors.reference_number && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                {errors.reference_number}
+              </p>
+            )}
+          </div>
+          
+          {/* Date Received */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Date Received*
+            </label>
+            <input
+              type="date"
+              name="date_received"
+              value={formData.date_received}
+              onChange={handleChange}
+              className={`w-full px-4 py-2 rounded-lg border ${
+                errors.date_received
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-200 dark:border-gray-700'
+              } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+              focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
+            />
+            {errors.date_received && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                {errors.date_received}
+              </p>
+            )}
+          </div>
+          
+          {/* Sender Organization */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Sender Organization*
+            </label>
+            <select
+              name="sender"
+              value={formData.sender}
+              onChange={handleChange}
+              className={`w-full px-4 py-2 rounded-lg border ${
+                errors.sender
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-200 dark:border-gray-700'
+              } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+              focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
+            >
+              <option value="">Select an organization</option>
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+            {errors.sender && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                {errors.sender}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {/* Row 2: Subject, Priority, Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Subject */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Subject / Request Type*
+            </label>
+            <input
+              type="text"
+              name="subject"
+              value={formData.subject}
+              onChange={handleChange}
+              className={`w-full px-4 py-2 rounded-lg border ${
+                errors.subject
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-200 dark:border-gray-700'
+              } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+              focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
+            />
+            {errors.subject && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                {errors.subject}
+              </p>
+            )}
+          </div>
+          
+          {/* Priority */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Priority
+            </label>
+            <select
+              name="priority"
+              value={formData.priority}
+              onChange={handleChange}
+              className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                       bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+            >
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          
+          {/* Buttons */}
+          <div className="flex items-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 
+                       dark:hover:text-white transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg
+                       hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
+                       flex items-center gap-2 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Request'
+              )}
+            </button>
+          </div>
+        </div>
+        
+        {/* Description */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Description
+          </label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows="3"
+            className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+          />
+        </div>
+        
+        {/* Duplicate warning (if needed) */}
+        {isDuplicate && duplicateDetails && (
+          <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg text-sm">
+            <p className="font-medium">Duplicate reference number detected</p>
+            <p className="mt-1">
+              This reference number already exists for a request received on{' '}
+              {new Date(duplicateDetails.date_received).toLocaleDateString()}. 
+              Current status: {duplicateDetails.status.toUpperCase()}
+            </p>
+            <p className="mt-1">You can continue with this reference if needed.</p>
+          </div>
+        )}
+      </form>
+    );
+  }
+
+  // Default Layout
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -144,384 +542,184 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
       )}
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Form fields with conditional layout */}
-        {layoutType === "compact" ? (
-          <>
-            {/* Compact layout with 3 columns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Reference Number */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Reference Number*
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="reference_number"
-                    value={formData.reference_number}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      errors.reference_number
-                        ? 'border-red-500 dark:border-red-500'
-                        : 'border-gray-200 dark:border-gray-700'
-                    } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                    focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
-                  />
-                  {checkingRef && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                {errors.reference_number && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.reference_number}
-                  </p>
-                )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Reference Number*
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              name="reference_number"
+              value={formData.reference_number}
+              onChange={handleChange}
+              className={`w-full px-4 py-2 rounded-lg border ${
+                errors.reference_number
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-200 dark:border-gray-700'
+              } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+              focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
+            />
+            {checkingRef && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
               </div>
-              
-              {/* Date Received */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Received*
-                </label>
-                <input
-                  type="date"
-                  name="date_received"
-                  value={formData.date_received}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-2 rounded-lg border ${
-                    errors.date_received
-                      ? 'border-red-500 dark:border-red-500'
-                      : 'border-gray-200 dark:border-gray-700'
-                  } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
-                />
-                {errors.date_received && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.date_received}
-                  </p>
-                )}
-              </div>
-              
-              {/* Sender Organization */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Sender Organization*
-                </label>
-                <select
-                  name="sender"
-                  value={formData.sender}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-2 rounded-lg border ${
-                    errors.sender
-                      ? 'border-red-500 dark:border-red-500'
-                      : 'border-gray-200 dark:border-gray-700'
-                  } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
-                >
-                  <option value="">Select an organization</option>
-                  {organizations.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.sender && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.sender}
-                  </p>
-                )}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Subject */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Subject / Request Type*
-                </label>
-                <input
-                  type="text"
-                  name="subject"
-                  value={formData.subject}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-2 rounded-lg border ${
-                    errors.subject
-                      ? 'border-red-500 dark:border-red-500'
-                      : 'border-gray-200 dark:border-gray-700'
-                  } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
-                />
-                {errors.subject && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.subject}
-                  </p>
-                )}
-              </div>
-              
-              {/* Priority */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Priority
-                </label>
-                <select
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                           focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                >
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-              
-              {/* Buttons */}
-              <div className="flex items-end gap-2">
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  disabled={isSubmitting}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 
-                           dark:hover:text-white transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg
-                           hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
-                           flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Request'
-                  )}
-                </button>
-              </div>
-            </div>
-            
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows="3"
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-              />
-            </div>
-          </>
-        ) : (
-          // Default layout - one field per row
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Reference Number*
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  name="reference_number"
-                  value={formData.reference_number}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-2 rounded-lg border ${
-                    errors.reference_number
-                      ? 'border-red-500 dark:border-red-500'
-                      : 'border-gray-200 dark:border-gray-700'
-                  } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                  focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
-                />
-                {checkingRef && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                  </div>
-                )}
-              </div>
-              {errors.reference_number && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.reference_number}
-                </p>
-              )}
-              
-              {isDuplicate && duplicateDetails && (
-                <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg text-sm">
-                  <p className="font-medium">Duplicate reference number detected</p>
-                  <p className="mt-1">
-                    This reference number already exists for a request received on{' '}
-                    {new Date(duplicateDetails.date_received).toLocaleDateString()}. 
-                    Current status: {duplicateDetails.status.toUpperCase()}
-                  </p>
-                  <p className="mt-1">You can continue with this reference if needed.</p>
-                </div>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Date Received*
-              </label>
-              <input
-                type="date"
-                name="date_received"
-                value={formData.date_received}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 rounded-lg border ${
-                  errors.date_received
-                    ? 'border-red-500 dark:border-red-500'
-                    : 'border-gray-200 dark:border-gray-700'
-                } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
-              />
-              {errors.date_received && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.date_received}
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Sender Organization*
-              </label>
-              <select
-                name="sender"
-                value={formData.sender}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 rounded-lg border ${
-                  errors.sender
-                    ? 'border-red-500 dark:border-red-500'
-                    : 'border-gray-200 dark:border-gray-700'
-                } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
-              >
-                <option value="">Select an organization</option>
-                {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
-              {errors.sender && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.sender}
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Subject / Request Type*
-              </label>
-              <input
-                type="text"
-                name="subject"
-                value={formData.subject}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 rounded-lg border ${
-                  errors.subject
-                    ? 'border-red-500 dark:border-red-500'
-                    : 'border-gray-200 dark:border-gray-700'
-                } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
-              />
-              {errors.subject && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.subject}
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows="3"
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Priority
-              </label>
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-              >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-            
-            <div className="flex justify-end gap-4 pt-4">
-              <button
-                type="button"
-                onClick={onCancel}
-                disabled={isSubmitting}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 
-                         dark:hover:text-white transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg
-                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
-                         flex items-center gap-2 disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create Request'
-                )}
-              </button>
-            </div>
-          </>
-        )}
-        
-        {/* Duplicate reference warning (compact layout) */}
-        {layoutType === "compact" && isDuplicate && duplicateDetails && (
-          <div className="p-3 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg text-sm">
-            <p className="font-medium">Duplicate reference number detected</p>
-            <p className="mt-1">
-              This reference number already exists for a request received on{' '}
-              {new Date(duplicateDetails.date_received).toLocaleDateString()}. 
-              Current status: {duplicateDetails.status.toUpperCase()}
-            </p>
-            <p className="mt-1">You can continue with this reference if needed.</p>
+            )}
           </div>
-        )}
+          {errors.reference_number && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+              {errors.reference_number}
+            </p>
+          )}
+          
+          {isDuplicate && duplicateDetails && (
+            <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg text-sm">
+              <p className="font-medium">Duplicate reference number detected</p>
+              <p className="mt-1">
+                This reference number already exists for a request received on{' '}
+                {new Date(duplicateDetails.date_received).toLocaleDateString()}. 
+                Current status: {duplicateDetails.status.toUpperCase()}
+              </p>
+              <p className="mt-1">You can continue with this reference if needed.</p>
+            </div>
+          )}
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Date Received*
+          </label>
+          <input
+            type="date"
+            name="date_received"
+            value={formData.date_received}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 rounded-lg border ${
+              errors.date_received
+                ? 'border-red-500 dark:border-red-500'
+                : 'border-gray-200 dark:border-gray-700'
+            } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+            focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
+          />
+          {errors.date_received && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+              {errors.date_received}
+            </p>
+          )}
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Sender Organization*
+          </label>
+          <select
+            name="sender"
+            value={formData.sender}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 rounded-lg border ${
+              errors.sender
+                ? 'border-red-500 dark:border-red-500'
+                : 'border-gray-200 dark:border-gray-700'
+            } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+            focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
+          >
+            <option value="">Select an organization</option>
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
+          </select>
+          {errors.sender && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+              {errors.sender}
+            </p>
+          )}
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Subject / Request Type*
+          </label>
+          <input
+            type="text"
+            name="subject"
+            value={formData.subject}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 rounded-lg border ${
+              errors.subject
+                ? 'border-red-500 dark:border-red-500'
+                : 'border-gray-200 dark:border-gray-700'
+            } bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+            focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white`}
+          />
+          {errors.subject && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+              {errors.subject}
+            </p>
+          )}
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Description
+          </label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows="3"
+            className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Priority
+          </label>
+          <select
+            name="priority"
+            value={formData.priority}
+            onChange={handleChange}
+            className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+          >
+            <option value="low">Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        
+        <div className="flex justify-end gap-4 pt-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isSubmitting}
+            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 
+                     dark:hover:text-white transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg
+                     hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
+                     flex items-center gap-2 disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Request'
+            )}
+          </button>
+        </div>
       </form>
     </motion.div>
   );

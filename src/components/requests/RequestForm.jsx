@@ -28,8 +28,9 @@ const RequestForm = ({ onSubmit, onCancel }) => {
     const fetchOrganizations = async () => {
       try {
         const { data, error } = await supabase
-          .from('organizations')
+          .from('v4_organizations')
           .select('id, name')
+          .eq('is_active', true)
           .order('name');
           
         if (error) throw error;
@@ -49,7 +50,7 @@ const RequestForm = ({ onSubmit, onCancel }) => {
     setCheckingRef(true);
     try {
       const { data, error } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('id, reference_number, date_received, sender, subject, status')
         .eq('reference_number', reference)
         .limit(1);
@@ -185,7 +186,7 @@ const RequestForm = ({ onSubmit, onCancel }) => {
             <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg text-sm">
               <p className="font-medium">Duplicate reference number detected</p>
               <p className="mt-1">
-                This reference number already exists for a request received on {' '}
+                This reference number already exists for a request received on{' '}
                 {new Date(duplicateDetails.date_received).toLocaleDateString()}. 
                 Current status: {duplicateDetails.status.toUpperCase()}
               </p>

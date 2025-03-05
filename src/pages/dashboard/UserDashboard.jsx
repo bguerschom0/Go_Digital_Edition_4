@@ -7,18 +7,20 @@ import {
   CheckSquare, 
   ArrowRight,
   Inbox,
-  Upload
+  Upload,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../config/supabase';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 const UserDashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
     assignedRequests: 0,
     pendingRequests: 0,
-    completedRequests: 0
+    completedRequests: 0,
+    urgentRequests: 0
   });
   const [recentRequests, setRecentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +39,7 @@ const UserDashboard = () => {
         .select('*', { count: 'exact' })
         .eq('assigned_to', user.id);
 
-      // Fetch pending requests count
+      // Fetch pending/in progress requests count
       const { count: pendingRequests } = await supabase
         .from('v4_requests')
         .select('*', { count: 'exact' })
@@ -50,6 +52,13 @@ const UserDashboard = () => {
         .select('*', { count: 'exact' })
         .eq('assigned_to', user.id)
         .eq('status', 'completed');
+
+      // Fetch urgent requests count
+      const { count: urgentRequests } = await supabase
+        .from('v4_requests')
+        .select('*', { count: 'exact' })
+        .eq('assigned_to', user.id)
+        .eq('priority', 'urgent');
 
       // Fetch recent assigned requests
       const { data: recentRequestsData } = await supabase
@@ -76,7 +85,8 @@ const UserDashboard = () => {
       setStats({
         assignedRequests: assignedRequests || 0,
         pendingRequests: pendingRequests || 0,
-        completedRequests: completedRequests || 0
+        completedRequests: completedRequests || 0,
+        urgentRequests: urgentRequests || 0
       });
       
       setRecentRequests(processedRecentRequests);
@@ -141,7 +151,7 @@ const UserDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {loading ? (
           <div className="flex items-center justify-center min-h-screen">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white"></div>
           </div>
         ) : (
           <div className="space-y-8">
@@ -160,7 +170,7 @@ const UserDashboard = () => {
             </motion.div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -223,13 +233,34 @@ const UserDashboard = () => {
                   </div>
                 </div>
               </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
+              >
+                <div className="flex items-center">
+                  <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/30 mr-4">
+                    <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Urgent Requests
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {stats.urgentRequests}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
             </div>
 
             {/* Recent Assigned Requests */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+              transition={{ delay: 0.5 }}
               className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
             >
               <div className="flex justify-between items-center mb-4">
@@ -288,7 +319,7 @@ const UserDashboard = () => {
                             </Link>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {format(new Date(request.date_received), 'dd MMM yyyy')}
+                            {format(parseISO(request.date_received), 'dd MMM yyyy')}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             <div className="truncate max-w-xs">
@@ -320,7 +351,7 @@ const UserDashboard = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+              transition={{ delay: 0.6 }}
               className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
             >
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -348,7 +379,7 @@ const UserDashboard = () => {
                   </div>
                 </Link>
                 <Link
-                  to={`/requests?status=completed`}
+                  to={`/requests?filter=assigned`}
                   className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                 >
                   <Upload className="h-6 w-6 text-green-500 mr-3" />

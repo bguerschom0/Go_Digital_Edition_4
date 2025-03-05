@@ -64,7 +64,7 @@ const generateRandomPassword = (length) => {
     window.crypto.getRandomValues(randomValues);
     
     for (let i = 0; i < length; i++) {
-      result += characters.charAt(randomValues[i] % charactersLength);
+      result += characters[randomValues[i] % charactersLength];
     }
   } else {
     // Fallback to Math.random

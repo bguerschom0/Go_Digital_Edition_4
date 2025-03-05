@@ -37,7 +37,7 @@ const OrgDashboard = () => {
       // Get user's organization
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('organization')
+        .select('user_role_v4')
         .eq('id', user.id)
         .single();
         

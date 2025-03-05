@@ -10,8 +10,12 @@ import {
   UserCog,
   Building,
   MessageSquare,
-  ListChecks,
-  UserPlus
+  FileSearch,
+  PieChart,
+  Settings,
+  List,
+  Plus,
+  Bell
 } from 'lucide-react';
 
 export const roleBasedNavigation = {
@@ -29,7 +33,12 @@ export const roleBasedNavigation = {
         {
           name: 'All Requests',
           path: '/requests',
-          icon: Bookmark
+          icon: List
+        },
+        {
+          name: 'New Request',
+          path: '/requests/new',
+          icon: Plus
         },
         {
           name: 'Pending Requests',
@@ -49,18 +58,50 @@ export const roleBasedNavigation = {
       icon: BarChart,
       children: [
         {
-          name: 'Request Analytics',
-          path: '/request-analytics',
-          icon: BarChart
-        },
-        {
           name: 'Request Reports',
           path: '/reports/requests',
-          icon: FileText
+          icon: FileSearch
+        },
+        {
+          name: 'Performance Reports',
+          path: '/reports/performance',
+          icon: PieChart
+        },
+        {
+          name: 'Organization Reports',
+          path: '/reports/organizations',
+          icon: Building
         }
       ]
     },
     {
+      name: 'Organizations',
+      path: '/organizations',
+      icon: Building,
+      children: [
+        {
+          name: 'All Organizations',
+          path: '/organizations',
+          icon: List
+        },
+        {
+          name: 'Add Organization',
+          path: '/organizations/new',
+          icon: Plus
+        },
+        {
+          name: 'Organization Users',
+          path: '/organizations/users',
+          icon: Users
+        }
+      ]
+    },
+    {
+      name: 'User Management',
+      path: '/user-management',
+      icon: Users
+    },
+        {
       name: 'Dashboards',
       path: '',
       icon: LayoutDashboard,
@@ -78,26 +119,14 @@ export const roleBasedNavigation = {
       ]
     },
     {
-      name: 'User Management',
-      path: '/user-management',
-      icon: Users
+      name: 'Notifications',
+      path: '/notifications',
+      icon: Bell
     },
     {
-      name: 'Organizations',
-      path: '/organizations',
-      icon: Building,
-      children: [
-        {
-          name: 'Organization List',
-          path: '/organizations',
-          icon: ListChecks
-        },
-        {
-          name: 'Organization Users',
-          path: '/organization-users',
-          icon: UserPlus
-        }
-      ]
+      name: 'Settings',
+      path: '/settings',
+      icon: Settings
     }
   ],
   
@@ -115,7 +144,12 @@ export const roleBasedNavigation = {
         {
           name: 'All Requests',
           path: '/requests',
-          icon: Bookmark
+          icon: List
+        },
+        {
+          name: 'New Request',
+          path: '/requests/new',
+          icon: Plus
         },
         {
           name: 'Pending Requests',
@@ -133,6 +167,28 @@ export const roleBasedNavigation = {
           icon: Upload
         }
       ]
+    },
+    {
+      name: 'Organizations',
+      path: '/organizations',
+      icon: Building,
+      children: [
+        {
+          name: 'All Organizations',
+          path: '/organizations',
+          icon: List
+        },
+        {
+          name: 'View Organization Users',
+          path: '/organizations/users/view',
+          icon: Users
+        }
+      ]
+    },
+    {
+      name: 'Notifications',
+      path: '/notifications',
+      icon: Bell
     }
   ],
   
@@ -150,7 +206,12 @@ export const roleBasedNavigation = {
         {
           name: 'All Requests',
           path: '/requests',
-          icon: Bookmark
+          icon: List
+        },
+        {
+          name: 'New Request',
+          path: '/requests/new',
+          icon: Plus
         },
         {
           name: 'Pending Requests',
@@ -165,9 +226,14 @@ export const roleBasedNavigation = {
       ]
     },
     {
-      name: 'Organization',
+      name: 'Organization Profile',
       path: '/organization-profile',
       icon: Building
+    },
+    {
+      name: 'Notifications',
+      path: '/notifications',
+      icon: Bell
     },
     {
       name: 'Contact Support',
@@ -176,3 +242,9 @@ export const roleBasedNavigation = {
     }
   ]
 };
+
+
+
+
+
+  

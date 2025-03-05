@@ -1,0 +1,727 @@
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { 
+  BarChart as BarChartIcon, 
+  Calendar, 
+  Download, 
+  Building,
+  Loader2,
+  Filter,
+  X
+} from 'lucide-react';
+import { supabase } from '../../config/supabase';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line
+} from 'recharts';
+import * as XLSX from 'xlsx';
+import { format, parseISO, subMonths } from 'date-fns';
+
+// Chart colors
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
+const STATUS_COLORS = {
+  pending: '#FFBB28',
+  in_progress: '#0088FE',
+  completed: '#00C49F'
+};
+
+const OrganizationReports = () => {
+  // Default date range (last 6 months)
+  const [dateRange, setDateRange] = useState({
+    start: format(subMonths(new Date(), 6), 'yyyy-MM-dd'),
+    end: format(new Date(), 'yyyy-MM-dd')
+  });
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Organizations data
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrganization, setSelectedOrganization] = useState('all');
+  
+  // Report data
+  const [orgRequestVolume, setOrgRequestVolume] = useState([]);
+  const [orgResponseTimes, setOrgResponseTimes] = useState([]);
+  const [orgMonthlyActivity, setOrgMonthlyActivity] = useState([]);
+  const [statusDistribution, setStatusDistribution] = useState([]);
+  
+  // Summary metrics
+  const [summaryMetrics, setSummaryMetrics] = useState({
+    totalRequests: 0,
+    avgResponseTime: 0,
+    completionRate: 0,
+    pendingRequests: 0
+  });
+
+  // Fetch organizations list
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('v4_organizations')
+          .select('id, name')
+          .order('name');
+          
+        if (error) throw error;
+        
+        setOrganizations(data || []);
+      } catch (err) {
+        console.error('Error fetching organizations:', err);
+        setError('Failed to load organizations');
+      }
+    };
+    
+    fetchOrganizations();
+  }, []);
+
+  // Fetch report data
+  useEffect(() => {
+    const fetchReportData = async () => {
+      if (organizations.length === 0) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch organization request volume
+        const fetchOrgVolume = async () => {
+          let query = supabase
+            .from('v4_requests')
+            .select('sender, organizations!v4_requests_sender_fkey(name), count(*)', { count: 'exact' })
+            .gte('date_received', dateRange.start)
+            .lte('date_received', dateRange.end)
+            .groupBy('sender, organizations!v4_requests_sender_fkey(name)');
+            
+          if (selectedOrganization !== 'all') {
+            query = query.eq('sender', selectedOrganization);
+          }
+          
+          const { data, error } = await query;
+          
+          if (error) throw error;
+          
+          // Process data for chart
+          const processedData = data.map((item, index) => ({
+            name: item.organizations.name,
+            value: parseInt(item.count),
+            color: COLORS[index % COLORS.length]
+          }));
+          
+          setOrgRequestVolume(processedData);
+        };
+
+        // Fetch organization response times
+        const fetchResponseTimes = async () => {
+          let query = supabase.rpc('v4_get_avg_response_times_by_org', {
+            start_date: dateRange.start,
+            end_date: dateRange.end
+          });
+          
+          if (selectedOrganization !== 'all') {
+            query = query.eq('org_id', selectedOrganization);
+          }
+          
+          const { data, error } = await query;
+          
+          if (error) throw error;
+          
+          // Process data for chart
+          const processedData = (data || []).map((item, index) => ({
+            name: item.org_name,
+            value: parseFloat(item.avg_days.toFixed(1)),
+            color: COLORS[index % COLORS.length]
+          }));
+          
+          setOrgResponseTimes(processedData);
+        };
+
+        // Fetch monthly activity by organization
+        const fetchMonthlyActivity = async () => {
+          const { data, error } = await supabase.rpc('v4_get_monthly_requests_by_org', {
+            start_date: dateRange.start,
+            end_date: dateRange.end,
+            org_id: selectedOrganization !== 'all' ? selectedOrganization : null
+          });
+          
+          if (error) throw error;
+          
+          // Process data for chart
+          const processedData = (data || []).map(item => ({
+            month: format(parseISO(item.month), 'MMM yyyy'),
+            total: parseInt(item.total_count),
+            completed: parseInt(item.completed_count),
+            pending: parseInt(item.pending_count),
+            in_progress: parseInt(item.in_progress_count)
+          }));
+          
+          setOrgMonthlyActivity(processedData);
+        };
+
+        // Fetch status distribution
+        const fetchStatusDistribution = async () => {
+          let query = supabase
+            .from('v4_requests')
+            .select('status, count(*)', { count: 'exact' })
+            .gte('date_received', dateRange.start)
+            .lte('date_received', dateRange.end)
+            .groupBy('status');
+            
+          if (selectedOrganization !== 'all') {
+            query = query.eq('sender', selectedOrganization);
+          }
+          
+          const { data, error } = await query;
+          
+          if (error) throw error;
+          
+          // Process data for chart
+          const processedData = (data || []).map(item => ({
+            name: formatStatus(item.status),
+            value: parseInt(item.count),
+            color: STATUS_COLORS[item.status] || '#8884D8'
+          }));
+          
+          setStatusDistribution(processedData);
+          
+          // Update summary metrics
+          const totalRequests = processedData.reduce((sum, item) => sum + item.value, 0);
+          const completedCount = processedData.find(item => item.name === 'Completed')?.value || 0;
+          const pendingCount = processedData.find(item => item.name === 'Pending')?.value || 0;
+          
+          setSummaryMetrics(prev => ({
+            ...prev,
+            totalRequests,
+            completionRate: totalRequests > 0 ? (completedCount / totalRequests * 100).toFixed(1) : 0,
+            pendingRequests: pendingCount
+          }));
+        };
+
+        // Fetch average response time
+        const fetchAvgResponseTime = async () => {
+          let query = supabase.rpc('v4_get_avg_response_time', {
+            start_date: dateRange.start,
+            end_date: dateRange.end,
+            org_id: selectedOrganization !== 'all' ? selectedOrganization : null
+          });
+          
+          const { data, error } = await query;
+          
+          if (error) throw error;
+          
+          if (data && data[0] && data[0].avg_days !== null) {
+            setSummaryMetrics(prev => ({
+              ...prev,
+              avgResponseTime: parseFloat(data[0].avg_days.toFixed(1))
+            }));
+          }
+        };
+
+        // Run all queries in parallel
+        await Promise.all([
+          fetchOrgVolume(),
+          fetchResponseTimes(),
+          fetchMonthlyActivity(),
+          fetchStatusDistribution(),
+          fetchAvgResponseTime()
+        ]);
+        
+      } catch (err) {
+        console.error('Error fetching report data:', err);
+        setError('Failed to load report data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchReportData();
+  }, [organizations, selectedOrganization, dateRange]);
+
+  // Helper function to format status
+  const formatStatus = (status) => {
+    return status.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  // Export data to Excel
+  const exportToExcel = () => {
+    try {
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      
+      // Create organization volume sheet
+      const orgVolumeSheet = XLSX.utils.json_to_sheet(
+        orgRequestVolume.map(org => ({
+          'Organization': org.name,
+          'Request Count': org.value,
+          'Percentage': `${((org.value / summaryMetrics.totalRequests) * 100).toFixed(1)}%`
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, orgVolumeSheet, 'Organization Volume');
+      
+      // Create response times sheet
+      const responseTimesSheet = XLSX.utils.json_to_sheet(
+        orgResponseTimes.map(org => ({
+          'Organization': org.name,
+          'Average Response Time (Days)': org.value
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, responseTimesSheet, 'Response Times');
+      
+      // Create monthly activity sheet
+      const monthlySheet = XLSX.utils.json_to_sheet(
+        orgMonthlyActivity.map(item => ({
+          'Month': item.month,
+          'Total Requests': item.total,
+          'Completed': item.completed,
+          'In Progress': item.in_progress,
+          'Pending': item.pending
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, monthlySheet, 'Monthly Activity');
+      
+      // Create status distribution sheet
+      const statusSheet = XLSX.utils.json_to_sheet(
+        statusDistribution.map(status => ({
+          'Status': status.name,
+          'Count': status.value,
+          'Percentage': `${((status.value / summaryMetrics.totalRequests) * 100).toFixed(1)}%`
+        }))
+      );
+      XLSX.utils.book_append_sheet(wb, statusSheet, 'Status Distribution');
+      
+      // Generate filename with date and selected organization
+      const orgName = selectedOrganization !== 'all' 
+        ? organizations.find(org => org.id === selectedOrganization)?.name || 'Selected' 
+        : 'All';
+      const filename = `organization_report_${orgName}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      
+      // Write file
+      XLSX.writeFile(wb, filename);
+    } catch (err) {
+      console.error('Error exporting to Excel:', err);
+      alert('Failed to export data. Please try again.');
+    }
+  };
+
+return (
+  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Organization Reports
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Analyze requests by organization with detailed metrics
+          </p>
+        </div>
+        
+        <button
+          onClick={handleExportExcel}
+          disabled={loading || !selectedOrganization}
+          className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
+                   hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export to Excel
+        </button>
+      </div>
+      
+      {/* Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Report Filters
+          </h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Organization select */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Organization
+            </label>
+            <select
+              value={selectedOrganization}
+              onChange={(e) => setSelectedOrganization(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                       bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+            >
+              <option value="">Select an Organization</option>
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          {/* Date Range Start */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Date Range (Start)
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+              />
+            </div>
+          </div>
+          
+          {/* Date Range End */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Date Range (End)
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+              />
+            </div>
+          </div>
+        </div>
+      </motion.div>
+      
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <span className="ml-2 text-gray-500 dark:text-gray-400">Loading data...</span>
+        </div>
+      ) : !selectedOrganization ? (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-12 text-center">
+          <Building className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            Select an Organization
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+            Please select an organization from the dropdown above to view detailed reports.
+          </p>
+        </div>
+      ) : orgData.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-12 text-center">
+          <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No Data Available
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+            There are no requests for this organization within the selected date range.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Organization Summary */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Building className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {orgSummary.name} - Summary
+              </h2>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Total Requests
+                </h3>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {orgSummary.totalRequests}
+                </p>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Completed
+                </h3>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {orgSummary.completedRequests}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {orgSummary.completionRate}% completion rate
+                </p>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Pending
+                </h3>
+                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                  {orgSummary.pendingRequests}
+                </p>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Avg. Response Time
+                </h3>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {orgSummary.avgResponseDays !== null ? `${orgSummary.avgResponseDays} days` : 'N/A'}
+                </p>
+              </div>
+            </div>
+            
+            {orgSummary.contactPerson && (
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                  Organization Contact
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Contact Person
+                    </p>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {orgSummary.contactPerson}
+                    </p>
+                  </div>
+                  
+                  {orgSummary.email && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Email
+                      </p>
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {orgSummary.email}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {orgSummary.phone && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Phone
+                      </p>
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {orgSummary.phone}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </motion.div>
+          
+          {/* Status Distribution Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <PieChartIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Request Status Distribution
+              </h2>
+            </div>
+            
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+          
+          {/* Monthly Trends */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <BarChartIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Monthly Request Trends
+              </h2>
+            </div>
+            
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={monthlyData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="total" 
+                    name="Total"
+                    stroke="#8884d8" 
+                    strokeWidth={2}
+                    activeDot={{ r: 8 }} 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="pending" 
+                    name="Pending"
+                    stroke="#FFBB28" 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="in_progress" 
+                    name="In Progress"
+                    stroke="#0088FE" 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="completed" 
+                    name="Completed"
+                    stroke="#00C49F" 
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+          
+          {/* Recent Requests Table */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Recent Requests
+              </h2>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Reference
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Subject
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Response Time
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {recentRequests.map((request) => {
+                    // Calculate response time for completed requests
+                    const responseTime = request.completed_at && request.date_received
+                      ? Math.round((new Date(request.completed_at) - new Date(request.date_received)) / (1000 * 60 * 60 * 24))
+                      : null;
+                      
+                    return (
+                      <tr key={request.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400">
+                          <Link to={`/requests/${request.id}`}>
+                            {request.reference_number}
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {format(new Date(request.date_received), 'dd MMM yyyy')}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                          <div className="truncate max-w-xs">
+                            {request.subject}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                            {formatStatus(request.status)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {responseTime !== null ? (
+                            `${responseTime} days`
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            
+            {recentRequests.length > 0 && (
+              <div className="mt-4 text-right">
+                <Link 
+                  to={`/requests?organization=${selectedOrganization}`} 
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-end"
+                >
+                  View all organization requests
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+export default OrganizationReports;

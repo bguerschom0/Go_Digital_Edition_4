@@ -797,4 +797,6 @@ const RequestDetail = () => {
   </div>
 );
 
+};
+
   export default RequestDetail;

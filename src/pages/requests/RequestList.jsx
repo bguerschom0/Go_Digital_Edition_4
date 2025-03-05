@@ -13,18 +13,20 @@ import {
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import RequestCard from '../../components/requests/RequestCard';
-import RequestForm from '../../components/requests/RequestForm';
+import useRoleCheck from '../../hooks/useRoleCheck';
+import { format } from 'date-fns';
 
 const RequestList = () => {
   const { user } = useAuth();
+  const { canProcessRequests, isRestrictedToOrganization } = useRoleCheck();
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [filteredRequests, setFilteredRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [showNewRequestForm, setShowNewRequestForm] = useState(false);
   const [organizations, setOrganizations] = useState([]);
+  const [userOrganizations, setUserOrganizations] = useState([]);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -37,6 +39,36 @@ const RequestList = () => {
     priority: 'all'
   });
 
+  // Fetch user's organizations if they're an organization user
+  useEffect(() => {
+    const fetchUserOrganizations = async () => {
+      if (isRestrictedToOrganization() && user) {
+        try {
+          const { data, error } = await supabase
+            .from('v4_user_organizations')
+            .select(`
+              organization_id,
+              v4_organizations (id, name)
+            `)
+            .eq('user_id', user.id);
+            
+          if (error) throw error;
+          
+          if (data && data.length > 0) {
+            setUserOrganizations(data.map(item => ({
+              id: item.organization_id,
+              name: item.v4_organizations.name
+            })));
+          }
+        } catch (error) {
+          console.error('Error fetching user organizations:', error);
+        }
+      }
+    };
+    
+    fetchUserOrganizations();
+  }, [user, isRestrictedToOrganization]);
+
   // Fetch all requests
   useEffect(() => {
     const fetchRequests = async () => {
@@ -44,37 +76,19 @@ const RequestList = () => {
         setLoading(true);
         
         let query = supabase
-          .from('requests')
+          .from('v4_requests')
           .select(`
             *,
-            organizations:sender (name),
-            files:request_files (id),
-            comments (id)
+            v4_organizations:sender (name),
+            v4_request_files!v4_request_files_request_id_fkey (id),
+            v4_comments!v4_comments_request_id_fkey (id)
           `)
           .order('date_received', { ascending: false });
           
         // Apply organization filter for organization users
-        if (user.role === 'organization') {
-          // Get user's organization
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('organization')
-            .eq('id', user.id)
-            .single();
-            
-          if (userError) throw userError;
-          
-          // Get organization ID
-          const { data: orgData, error: orgError } = await supabase
-            .from('organizations')
-            .select('id')
-            .eq('name', userData.organization)
-            .single();
-            
-          if (orgError) throw orgError;
-          
-          // Filter requests by organization
-          query = query.eq('sender', orgData.id);
+        if (isRestrictedToOrganization() && userOrganizations.length > 0) {
+          const orgIds = userOrganizations.map(org => org.id);
+          query = query.in('sender', orgIds);
         }
         
         const { data, error } = await query;
@@ -84,9 +98,9 @@ const RequestList = () => {
         // Process request data
         const processedRequests = data.map(request => ({
           ...request,
-          sender: request.organizations.name,
-          files_count: request.files ? request.files.length : 0,
-          comments_count: request.comments ? request.comments.length : 0
+          sender_name: request.v4_organizations?.name || 'Unknown',
+          files_count: request.v4_request_files ? request.v4_request_files.length : 0,
+          comments_count: request.v4_comments ? request.v4_comments.length : 0
         }));
         
         setRequests(processedRequests);
@@ -102,7 +116,7 @@ const RequestList = () => {
     const fetchOrganizations = async () => {
       try {
         const { data, error } = await supabase
-          .from('organizations')
+          .from('v4_organizations')
           .select('id, name')
           .order('name');
           
@@ -118,11 +132,11 @@ const RequestList = () => {
 
     // Set up real-time subscription for new requests
     const requestSubscription = supabase
-      .channel('public:requests')
+      .channel('public:v4_requests')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'requests'
+        table: 'v4_requests'
       }, () => {
         // Refetch requests when changes occur
         fetchRequests();
@@ -132,7 +146,7 @@ const RequestList = () => {
     return () => {
       supabase.removeChannel(requestSubscription);
     };
-  }, [user.id, user.role]);
+  }, [isRestrictedToOrganization, userOrganizations]);
 
   // Apply filters and search
   useEffect(() => {
@@ -171,32 +185,12 @@ const RequestList = () => {
       result = result.filter(request => 
         request.reference_number.toLowerCase().includes(lowerSearchTerm) ||
         request.subject.toLowerCase().includes(lowerSearchTerm) ||
-        request.sender.toLowerCase().includes(lowerSearchTerm)
+        request.sender_name.toLowerCase().includes(lowerSearchTerm)
       );
     }
     
     setFilteredRequests(result);
   }, [requests, filters, searchTerm]);
-
-  // Handle creating a new request
-  const handleCreateRequest = async (requestData) => {
-    try {
-      const { data, error } = await supabase
-        .from('requests')
-        .insert([requestData])
-        .select()
-        .single();
-        
-      if (error) throw error;
-      
-      // Navigate to the new request detail page
-      navigate(`/requests/${data.id}`);
-      setShowNewRequestForm(false);
-    } catch (error) {
-      console.error('Error creating request:', error);
-      throw error;
-    }
-  };
 
   // Clear all filters
   const clearFilters = () => {
@@ -226,10 +220,10 @@ const RequestList = () => {
             </p>
           </div>
           
-          {/* Only show "New Request" button for admin and processor roles */}
-          {(user.role === 'admin' || user.role === 'processor') && (
+          {/* Only show "New Request" button for admin and user roles */}
+          {canProcessRequests() && (
             <button
-              onClick={() => setShowNewRequestForm(true)}
+              onClick={() => navigate('/requests/new')}
               className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
                        hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
             >
@@ -298,27 +292,51 @@ const RequestList = () => {
                   </select>
                 </div>
                 
-                {/* Organization filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Organization
-                  </label>
-                  <select
-                    value={filters.organization}
-                    onChange={(e) => setFilters({ ...filters, organization: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                             focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                    disabled={user.role === 'organization'} // Disable for organization users
-                  >
-                    <option value="all">All Organizations</option>
-                    {organizations.map((org) => (
-                      <option key={org.id} value={org.name}>
-                        {org.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Organization filter - if not restricted to specific orgs */}
+                {!isRestrictedToOrganization() && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Organization
+                    </label>
+                    <select
+                      value={filters.organization}
+                      onChange={(e) => setFilters({ ...filters, organization: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                               focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                    >
+                      <option value="all">All Organizations</option>
+                      {organizations.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
+                {/* Organization filter - if restricted to specific orgs */}
+                {isRestrictedToOrganization() && userOrganizations.length > 1 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Your Organizations
+                    </label>
+                    <select
+                      value={filters.organization}
+                      onChange={(e) => setFilters({ ...filters, organization: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                               focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                    >
+                      <option value="all">All Your Organizations</option>
+                      {userOrganizations.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 
                 {/* Date range filter */}
                 <div>
@@ -415,7 +433,7 @@ const RequestList = () => {
                  filters.dateRange.start || filters.dateRange.end || filters.priority !== 'all' ? (
                   'No requests match your current filters. Try adjusting your search criteria.'
                  ) : (
-                  'No document requests have been recorded yet. Click "New Request" to add one.'
+                  'No document requests have been recorded yet.'
                  )}
               </p>
               {(searchTerm || filters.status !== 'all' || filters.organization !== 'all' || 
@@ -442,18 +460,6 @@ const RequestList = () => {
           </div>
         )}
       </div>
-      
-      {/* New Request Modal */}
-      {showNewRequestForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <RequestForm 
-              onSubmit={handleCreateRequest}
-              onCancel={() => setShowNewRequestForm(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

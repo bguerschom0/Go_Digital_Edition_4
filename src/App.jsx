@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { getRoleBasedDashboard } from './utils/roleRoutes';
-import { NotificationProvider } from './contexts/NotificationContext';
 
 // Layout Components
 import Header from './components/layout/Header';
@@ -20,17 +19,20 @@ import OrgDashboard from './pages/dashboard/OrgDashboard';
 // Request Pages
 import RequestList from './pages/requests/RequestList';
 import RequestDetail from './pages/requests/RequestDetail';
-import RequestAnalytics from './pages/requests/RequestAnalytics';
+import NewRequest from './pages/requests/NewRequest';
+
+// Organization Pages
+import OrganizationList from './pages/organizations/OrganizationList';
+import OrganizationDetail from './pages/organizations/OrganizationDetail';
+import OrganizationUsers from './pages/organizations/OrganizationUsers';
 
 // Report Pages
 import RequestReports from './pages/reports/RequestReports';
+import PerformanceReports from './pages/reports/PerformanceReports';
+import OrganizationReports from './pages/reports/OrganizationReports';
+import CustomReports from './pages/reports/CustomReports';
 
-// Organization Management
-import OrganizationUsers from './pages/organizations/OrganizationUsers';
-import OrganizationList from './pages/organizations/OrganizationList';
-import OrganizationDetail from './pages/organizations/OrganizationDetail';
-
-// Notification Pages
+// Notification Page
 import NotificationCenter from './pages/notifications/NotificationCenter';
 
 const ProtectedRoute = ({ children, requiredRoles = [] }) => {
@@ -74,30 +76,31 @@ const App = () => {
 
       {/* Dashboard routes */}
       <Route path="/admindashboard" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><AdminDashboard /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/userdashboard" element={<ProtectedRoute requiredRoles={['user']}><AuthenticatedLayout><UserDashboard /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/orgdashboard" element={<ProtectedRoute requiredRoles={['organization']}><AuthenticatedLayout><OrgDashboard /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/userdashboard" element={<ProtectedRoute requiredRoles={['administrator','user']}><AuthenticatedLayout><UserDashboard /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/orgdashboard" element={<ProtectedRoute requiredRoles={['administrator','organization']}><AuthenticatedLayout><OrgDashboard /></AuthenticatedLayout></ProtectedRoute>} />
       
       {/* User Management routes - only for administrators */}
       <Route path="/user-management" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><UserManagement /></AuthenticatedLayout></ProtectedRoute>} />
       
-      {/* Organization management routes */}
-      <Route path="/organizations" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationList /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/organization-users" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationUsers /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/organizations/:id" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationDetail /></AuthenticatedLayout></ProtectedRoute>} />
-
-
-      {/* Request routes - accessible by all authenticated users */}
+      {/* Request routes */}
       <Route path="/requests" element={<ProtectedRoute><AuthenticatedLayout><RequestList /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/requests/:id" element={<ProtectedRoute><AuthenticatedLayout><RequestDetail /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/requests/new" element={<ProtectedRoute requiredRoles={['administrator', 'user']}><AuthenticatedLayout><NewRequest /></AuthenticatedLayout></ProtectedRoute>} />
       
-      {/* Analytics and reporting - only for administrators */}
-      <Route path="/request-analytics" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><RequestAnalytics /></AuthenticatedLayout></ProtectedRoute>} />
+      {/* Organization routes - only for administrators */}
+      <Route path="/organizations" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationList /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/organizations/users" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationUsers /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/organizations/:id" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationDetail /></AuthenticatedLayout></ProtectedRoute>} />
+      
+      {/* Report routes - only for administrators */}
       <Route path="/reports/requests" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><RequestReports /></AuthenticatedLayout></ProtectedRoute>} />
-
-      {/* Notifications - for all authenticated users */}
+      <Route path="/reports/performance" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><PerformanceReports /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/reports/organizations" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationReports /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/reports/custom" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><CustomReports /></AuthenticatedLayout></ProtectedRoute>} />
+      
+      {/* Notification route */}
       <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout><NotificationCenter /></AuthenticatedLayout></ProtectedRoute>} />
 
-      
       {/* Root route redirect */}
       <Route path="/" element={<Navigate to={user ? getRoleBasedDashboard(user.role) : "/login"} replace />} />
 

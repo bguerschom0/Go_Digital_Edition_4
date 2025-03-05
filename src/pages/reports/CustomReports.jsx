@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { useReports } from '../../hooks/useReports';
+import  useReports  from '../../hooks/useReports';
 import ReportFilters from '../../components/reports/ReportFilters';
 import ReportTable from '../../components/reports/ReportTable';
 import ReportChart from '../../components/reports/ReportChart';

@@ -130,15 +130,15 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
     }
   };
 
-  // Very Compact Layout
+  // Improved Compact Layout
   if (layoutType === "very-compact") {
     return (
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Row 1: Ref Number, Date, Organization */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-4">
           {/* Reference Number */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Reference Number*
             </label>
             <div className="relative">
@@ -147,7 +147,7 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
                 name="reference_number"
                 value={formData.reference_number}
                 onChange={handleChange}
-                className={`w-full px-2 py-1 text-sm rounded border ${
+                className={`w-full h-9 px-3 py-2 text-sm rounded border ${
                   errors.reference_number
                     ? 'border-red-500 dark:border-red-500'
                     : 'border-gray-200 dark:border-gray-700'
@@ -156,7 +156,7 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
               />
               {checkingRef && (
                 <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                  <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                 </div>
               )}
             </div>
@@ -169,17 +169,17 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
           
           {/* Date Received */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Date Received*
             </label>
             <div className="relative">
-              <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+              <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="date"
                 name="date_received"
                 value={formData.date_received}
                 onChange={handleChange}
-                className={`w-full pl-7 pr-2 py-1 text-sm rounded border ${
+                className={`w-full h-9 pl-8 pr-3 py-2 text-sm rounded border ${
                   errors.date_received
                     ? 'border-red-500 dark:border-red-500'
                     : 'border-gray-200 dark:border-gray-700'
@@ -196,14 +196,14 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
           
           {/* Sender Organization */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Sender Organization*
             </label>
             <select
               name="sender"
               value={formData.sender}
               onChange={handleChange}
-              className={`w-full px-2 py-1 text-sm rounded border ${
+              className={`w-full h-9 px-3 py-2 text-sm rounded border ${
                 errors.sender
                   ? 'border-red-500 dark:border-red-500'
                   : 'border-gray-200 dark:border-gray-700'
@@ -225,11 +225,11 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
           </div>
         </div>
         
-        {/* Row 2: Subject, Priority, Buttons */}
-        <div className="grid grid-cols-12 gap-3 items-end">
+        {/* Row 2: Subject and Priority */}
+        <div className="grid grid-cols-4 gap-4">
           {/* Subject */}
-          <div className="col-span-6">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <div className="col-span-3">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Subject / Request Type*
             </label>
             <input
@@ -237,7 +237,7 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
               name="subject"
               value={formData.subject}
               onChange={handleChange}
-              className={`w-full px-2 py-1 text-sm rounded border ${
+              className={`w-full h-9 px-3 py-2 text-sm rounded border ${
                 errors.subject
                   ? 'border-red-500 dark:border-red-500'
                   : 'border-gray-200 dark:border-gray-700'
@@ -252,15 +252,15 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
           </div>
           
           {/* Priority */}
-          <div className="col-span-3">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Priority
             </label>
             <select
               name="priority"
               value={formData.priority}
               onChange={handleChange}
-              className="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+              className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
                        bg-white dark:bg-gray-900 text-gray-900 dark:text-white
                        focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
             >
@@ -270,56 +270,57 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
               <option value="urgent">Urgent</option>
             </select>
           </div>
-          
-          {/* Buttons */}
-          <div className="col-span-3 flex gap-1 justify-end">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isSubmitting}
-              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 
-                       dark:hover:text-white transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-3 py-1 text-sm bg-black dark:bg-white text-white dark:text-black rounded
-                       hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
-                       flex items-center gap-1 disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Create'
-              )}
-            </button>
-          </div>
         </div>
         
         {/* Row 3: Description */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Description
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Description <span className="text-gray-500 dark:text-gray-400 font-normal">(Optional)</span>
           </label>
           <textarea
             name="description"
             value={formData.description}
             onChange={handleChange}
-            rows="2"
-            className="w-full px-2 py-1 text-sm rounded border border-gray-200 dark:border-gray-700
+            rows="3"
+            className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
                      bg-white dark:bg-gray-900 text-gray-900 dark:text-white
                      focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
           />
         </div>
         
+        {/* Buttons - placed after description */}
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isSubmitting}
+            className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 
+                     dark:hover:text-white transition-colors disabled:opacity-50 border border-gray-200 
+                     dark:border-gray-700 rounded"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
+                     hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
+                     flex items-center gap-1 disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Request'
+            )}
+          </button>
+        </div>
+        
         {/* Duplicate warning (if needed) */}
         {isDuplicate && duplicateDetails && (
-          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded text-xs">
+          <div className="p-3 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded text-sm">
             <p className="font-medium">Duplicate reference detected for request from {new Date(duplicateDetails.date_received).toLocaleDateString()} (Status: {duplicateDetails.status.toUpperCase()})</p>
           </div>
         )}
@@ -498,7 +499,7 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
         {/* Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Description
+            Description <span className="text-gray-500 dark:text-gray-400 font-normal">(Optional)</span>
           </label>
           <textarea
             name="description"
@@ -661,7 +662,7 @@ const RequestForm = ({ onSubmit, onCancel, isSubmitting = false, layoutType = "d
         
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Description
+            Description <span className="text-gray-500 dark:text-gray-400 font-normal">(Optional)</span>
           </label>
           <textarea
             name="description"

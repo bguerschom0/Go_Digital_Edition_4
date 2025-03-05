@@ -1,397 +1,333 @@
 import { supabase } from '../config/supabase';
-import { REQUEST_STATUS } from '../config/constants';
-import { calculateDeletionDate } from '../utils/dateUtils';
+import { format } from 'date-fns';
+import * as XLSX from 'xlsx';
 
 /**
- * Get all requests with pagination and filtering options
- * @param {Object} options - Options for filtering and pagination
- * @returns {Promise<Object>} - Requests data and count
+ * Service for handling report data from the database
  */
-export const getRequests = async (options = {}) => {
-  const {
-    page = 1,
-    pageSize = 10,
-    status = [],
-    organization = null,
-    searchTerm = '',
-    dateFrom = null,
-    dateTo = null,
-    userId = null,
-    onlyAssigned = false,
-    orderBy = 'date_received',
-    orderDirection = 'desc'
-  } = options;
+class ReportService {
+  /**
+   * Get status distribution of requests within a date range
+   * @param {string} startDate - Start date in YYYY-MM-DD format
+   * @param {string} endDate - End date in YYYY-MM-DD format
+   * @param {string} organizationId - Optional organization ID to filter by
+   * @returns {Promise<Array>} - Array of status counts
+   */
+  async getStatusDistribution(startDate, endDate, organizationId = null) {
+    try {
+      let query = supabase
+        .from('v4_requests')
+        .select('status, count(*)', { count: 'exact' })
+        .gte('date_received', startDate)
+        .lte('date_received', endDate)
+        .groupBy('status');
 
-  try {
-    // Calculate pagination values
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-
-    // Start building the query
-    let query = supabase
-      .from('requests')
-      .select(`
-        *,
-        organizations:sender (name),
-        created_by_user:created_by (full_name, username),
-        assigned_to_user:assigned_to (full_name, username),
-        updated_by_user:updated_by (full_name, username),
-        files:request_files (id),
-        comments (id)
-      `, { count: 'exact' });
-
-    // Apply status filter if specified
-    if (status && status.length > 0) {
-      query = query.in('status', status);
-    }
-
-    // Apply organization filter if specified
-    if (organization) {
-      query = query.eq('sender', organization);
-    }
-
-    // Apply date range filter if specified
-    if (dateFrom) {
-      query = query.gte('date_received', dateFrom);
-    }
-
-    if (dateTo) {
-      query = query.lte('date_received', dateTo);
-    }
-
-    // Apply user-specific filters
-    if (userId) {
-      if (onlyAssigned) {
-        // Only requests assigned to the user
-        query = query.eq('assigned_to', userId);
-      } else {
-        // Requests created by or assigned to the user
-        query = query.or(`created_by.eq.${userId},assigned_to.eq.${userId}`);
+      if (organizationId && organizationId !== 'all') {
+        query = query.eq('sender', organizationId);
       }
-    }
 
-    // Apply search term if specified
-    if (searchTerm) {
-      query = query.or(
-        `reference_number.ilike.%${searchTerm}%,subject.ilike.%${searchTerm}%`
-      );
-    }
-
-    // Apply ordering
-    query = query.order(orderBy, { ascending: orderDirection === 'asc' });
-
-    // Apply pagination
-    query = query.range(from, to);
-
-    // Execute query
-    const { data, error, count } = await query;
-
-    if (error) throw error;
-
-    // Process request data
-    const processedRequests = data.map(request => ({
-      ...request,
-      sender_name: request.organizations?.name,
-      files_count: request.files?.length || 0,
-      comments_count: request.comments?.length || 0
-    }));
-
-    return {
-      data: processedRequests,
-      count,
-      page,
-      pageSize,
-      totalPages: Math.ceil(count / pageSize)
-    };
-  } catch (error) {
-    console.error('Error fetching requests:', error);
-    throw error;
-  }
-};
-
-/**
- * Get a single request by ID
- * @param {string} requestId - The request ID
- * @returns {Promise<Object>} - Request data
- */
-export const getRequestById = async (requestId) => {
-  try {
-    const { data, error } = await supabase
-      .from('requests')
-      .select(`
-        *,
-        organizations:sender (id, name, contact_person, email, phone),
-        created_by_user:created_by (full_name, username),
-        assigned_to_user:assigned_to (full_name, username),
-        updated_by_user:updated_by (full_name, username),
-        files:request_files (id),
-        comments (id)
-      `)
-      .eq('id', requestId)
-      .single();
-
-    if (error) throw error;
-
-    // Process request data
-    const processedRequest = {
-      ...data,
-      sender_name: data.organizations?.name,
-      sender_org: data.organizations,
-      files_count: data.files?.length || 0,
-      comments_count: data.comments?.length || 0
-    };
-
-    return processedRequest;
-  } catch (error) {
-    console.error(`Error fetching request ${requestId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Create a new request
- * @param {Object} requestData - Request data
- * @param {string} userId - ID of the user creating the request
- * @returns {Promise<Object>} - Created request data
- */
-export const createRequest = async (requestData, userId) => {
-  try {
-    const { data, error } = await supabase
-      .from('requests')
-      .insert([
-        {
-          ...requestData,
-          created_by: userId,
-          status: REQUEST_STATUS.PENDING
-        }
-      ])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error creating request:', error);
-    throw error;
-  }
-};
-
-/**
- * Update an existing request
- * @param {string} requestId - ID of the request to update
- * @param {Object} updateData - Data to update
- * @param {string} userId - ID of the user updating the request
- * @returns {Promise<Object>} - Updated request data
- */
-export const updateRequest = async (requestId, updateData, userId) => {
-  try {
-    // Check if status is being updated to completed
-    let updatedData = {
-      ...updateData,
-      updated_by: userId,
-      updated_at: new Date().toISOString()
-    };
-
-    if (updateData.status === REQUEST_STATUS.COMPLETED && !updateData.completed_at) {
-      // Set completion date and calculate deletion date
-      const completionDate = new Date().toISOString();
-      updatedData.completed_at = completionDate;
-      updatedData.deletion_date = calculateDeletionDate(completionDate).toISOString();
-    }
-
-    const { data, error } = await supabase
-      .from('requests')
-      .update(updatedData)
-      .eq('id', requestId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error(`Error updating request ${requestId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Delete a request
- * @param {string} requestId - ID of the request to delete
- * @returns {Promise<boolean>} - True if successful
- */
-export const deleteRequest = async (requestId) => {
-  try {
-    const { error } = await supabase
-      .from('requests')
-      .delete()
-      .eq('id', requestId);
-
-    if (error) throw error;
-
-    return true;
-  } catch (error) {
-    console.error(`Error deleting request ${requestId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Get request files
- * @param {string} requestId - ID of the request
- * @returns {Promise<Array>} - Array of files
- */
-export const getRequestFiles = async (requestId) => {
-  try {
-    const { data, error } = await supabase
-      .from('request_files')
-      .select(`
-        *,
-        uploaded_by_user:uploaded_by (full_name, username)
-      `)
-      .eq('request_id', requestId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error(`Error fetching files for request ${requestId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Get request comments
- * @param {string} requestId - ID of the request
- * @returns {Promise<Array>} - Array of comments
- */
-export const getRequestComments = async (requestId) => {
-  try {
-    const { data, error } = await supabase
-      .from('comments')
-      .select(`
-        *,
-        users:user_id (id, full_name, username, role)
-      `)
-      .eq('request_id', requestId)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error(`Error fetching comments for request ${requestId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Add a comment to a request
- * @param {string} requestId - ID of the request
- * @param {string} userId - ID of the user adding the comment
- * @param {string} content - Comment content
- * @param {boolean} isInternal - Whether the comment is internal
- * @returns {Promise<Object>} - Created comment data
- */
-export const addComment = async (requestId, userId, content, isInternal = false) => {
-  try {
-    const { data, error } = await supabase
-      .from('comments')
-      .insert([
-        {
-          request_id: requestId,
-          user_id: userId,
-          content,
-          is_internal: isInternal
-        }
-      ])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error(`Error adding comment to request ${requestId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Get request statistics
- * @param {Object} options - Options for filtering statistics
- * @returns {Promise<Object>} - Statistics data
- */
-export const getRequestStatistics = async (options = {}) => {
-  const {
-    dateFrom = null,
-    dateTo = null,
-    organizationId = null,
-    userId = null
-  } = options;
-
-  try {
-    // Start building base query
-    let baseQuery = supabase.from('requests').select('*', { count: 'exact' });
-
-    // Apply filters
-    if (dateFrom) {
-      baseQuery = baseQuery.gte('date_received', dateFrom);
-    }
-
-    if (dateTo) {
-      baseQuery = baseQuery.lte('date_received', dateTo);
-    }
-
-    if (organizationId) {
-      baseQuery = baseQuery.eq('sender', organizationId);
-    }
-
-    if (userId) {
-      baseQuery = baseQuery.or(`created_by.eq.${userId},assigned_to.eq.${userId}`);
-    }
-
-    // Get total count
-    const { count: totalCount, error: totalError } = await baseQuery;
-
-    if (totalError) throw totalError;
-
-    // Get status counts
-    const stats = {
-      total: totalCount || 0,
-    };
-
-    // Get count for each status
-    for (const status of Object.values(REQUEST_STATUS)) {
-      const { count, error } = await baseQuery.eq('status', status);
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      stats[status] = count || 0;
+      // Format data for charts
+      return data.map(item => ({
+        name: this.formatStatus(item.status),
+        value: parseInt(item.count),
+        color: this.getStatusColor(item.status)
+      }));
+    } catch (error) {
+      console.error('Error fetching status distribution:', error);
+      return [];
     }
-
-    // Calculate completion rate
-    stats.completionRate = totalCount > 0
-      ? ((stats[REQUEST_STATUS.COMPLETED] / totalCount) * 100).toFixed(1)
-      : 0;
-
-    return stats;
-  } catch (error) {
-    console.error('Error getting request statistics:', error);
-    throw error;
   }
+
+  /**
+   * Get request count by organization
+   * @param {string} startDate - Start date in YYYY-MM-DD format
+   * @param {string} endDate - End date in YYYY-MM-DD format
+   * @returns {Promise<Array>} - Array of organization counts
+   */
+  async getRequestsByOrganization(startDate, endDate) {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_requests_by_organization', {
+          start_date: startDate,
+          end_date: endDate
+        });
+
+      if (error) {
+        // If RPC doesn't exist, fall back to regular query
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('v4_requests')
+          .select(`
+            sender,
+            organizations!inner(name),
+            count(*)
+          `)
+          .gte('date_received', startDate)
+          .lte('date_received', endDate)
+          .groupBy('sender, organizations.name');
+
+        if (fallbackError) throw fallbackError;
+
+        return fallbackData.map((item, index) => ({
+          name: item.organizations.name,
+          value: parseInt(item.count),
+          color: COLORS[index % COLORS.length]
+        }));
+      }
+
+      return data.map((item, index) => ({
+        name: item.organization_name,
+        value: parseInt(item.request_count),
+        color: COLORS[index % COLORS.length]
+      }));
+    } catch (error) {
+      console.error('Error fetching organization distribution:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get monthly request trends
+   * @param {string} startDate - Start date in YYYY-MM-DD format
+   * @param {string} endDate - End date in YYYY-MM-DD format
+   * @param {string} organizationId - Optional organization ID to filter by
+   * @returns {Promise<Array>} - Array of monthly data
+   */
+  async getMonthlyTrends(startDate, endDate, organizationId = null) {
+    try {
+      // This could be a stored procedure in the database
+      const { data, error } = await supabase
+        .rpc('get_monthly_request_trends', {
+          start_date: startDate,
+          end_date: endDate,
+          org_id: organizationId === 'all' ? null : organizationId
+        });
+
+      if (error) {
+        // If RPC doesn't exist, fall back to aggregating data in JS
+        // This is less efficient but works as a fallback
+        const { data: requestData, error: requestError } = await supabase
+          .from('v4_requests')
+          .select('id, date_received, status')
+          .gte('date_received', startDate)
+          .lte('date_received', endDate);
+
+        if (requestError) throw requestError;
+
+        // Process data by month and status
+        const monthlyData = {};
+        
+        requestData.forEach(request => {
+          const monthKey = format(new Date(request.date_received), 'yyyy-MM');
+          
+          if (!monthlyData[monthKey]) {
+            monthlyData[monthKey] = {
+              month: format(new Date(request.date_received), 'MMM yyyy'),
+              pending: 0,
+              in_progress: 0,
+              completed: 0,
+              total: 0
+            };
+          }
+          
+          monthlyData[monthKey][request.status]++;
+          monthlyData[monthKey].total++;
+        });
+        
+        return Object.values(monthlyData).sort((a, b) => {
+          const monthA = new Date(a.month);
+          const monthB = new Date(b.month);
+          return monthA - monthB;
+        });
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching monthly trends:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get average response time data
+   * @param {string} startDate - Start date in YYYY-MM-DD format
+   * @param {string} endDate - End date in YYYY-MM-DD format
+   * @param {string} groupBy - Field to group by (priority, organization)
+   * @returns {Promise<Array>} - Array of response time data
+   */
+  async getResponseTimeData(startDate, endDate, groupBy = 'priority') {
+    try {
+      if (groupBy === 'priority') {
+        const { data, error } = await supabase
+          .from('v4_requests')
+          .select('priority, completed_at, created_at')
+          .eq('status', 'completed')
+          .not('completed_at', 'is', null)
+          .gte('date_received', startDate)
+          .lte('date_received', endDate);
+
+        if (error) throw error;
+
+        // Group by priority
+        const priorityGroups = {};
+        
+        data.forEach(request => {
+          if (!priorityGroups[request.priority]) {
+            priorityGroups[request.priority] = [];
+          }
+          
+          const createdDate = new Date(request.created_at);
+          const completedDate = new Date(request.completed_at);
+          const responseDays = (completedDate - createdDate) / (1000 * 60 * 60 * 24);
+          
+          priorityGroups[request.priority].push(responseDays);
+        });
+        
+        return Object.entries(priorityGroups).map(([priority, days], index) => {
+          const avgDays = days.reduce((sum, day) => sum + day, 0) / days.length;
+          
+          return {
+            name: priority.charAt(0).toUpperCase() + priority.slice(1),
+            value: parseFloat(avgDays.toFixed(1)),
+            color: PRIORITY_COLORS[priority] || COLORS[index % COLORS.length]
+          };
+        });
+      } else if (groupBy === 'organization') {
+        // Implementation for organization grouping
+        const { data, error } = await supabase
+          .rpc('get_avg_response_time_by_org', {
+            start_date: startDate,
+            end_date: endDate
+          });
+
+        if (error) {
+          console.error('RPC error:', error);
+          return [];
+        }
+
+        return data.map((item, index) => ({
+          name: item.organization_name,
+          value: parseFloat(item.avg_days.toFixed(1)),
+          color: COLORS[index % COLORS.length]
+        }));
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Error fetching response time data:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get user activity report data
+   * @param {string} startDate - Start date in YYYY-MM-DD format
+   * @param {string} endDate - End date in YYYY-MM-DD format
+   * @returns {Promise<Array>} - Array of user activity data
+   */
+  async getUserActivityData(startDate, endDate) {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_user_activity', {
+          start_date: startDate,
+          end_date: endDate
+        });
+
+      if (error) {
+        console.error('RPC error:', error);
+        return [];
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching user activity data:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Export report data to Excel
+   * @param {Object} reportData - Object containing all report data
+   * @param {string} filename - Name for the exported file
+   */
+  exportToExcel(reportData, filename) {
+    try {
+      const wb = XLSX.utils.book_new();
+      
+      // Status distribution sheet
+      if (reportData.statusData && reportData.statusData.length > 0) {
+        const statusSheet = XLSX.utils.json_to_sheet(
+          reportData.statusData.map(item => ({
+            Status: item.name,
+            Count: item.value
+          }))
+        );
+        XLSX.utils.book_append_sheet(wb, statusSheet, 'Status Distribution');
+      }
+      
+      // Organization distribution sheet
+      if (reportData.orgData && reportData.orgData.length > 0) {
+        const orgSheet = XLSX.utils.json_to_sheet(
+          reportData.orgData.map(item => ({
+            Organization: item.name,
+            'Request Count': item.value
+          }))
+        );
+        XLSX.utils.book_append_sheet(wb, orgSheet, 'Organizations');
+      }
+      
+      // Monthly trends sheet
+      if (reportData.monthlyData && reportData.monthlyData.length > 0) {
+        const monthlySheet = XLSX.utils.json_to_sheet(reportData.monthlyData);
+        XLSX.utils.book_append_sheet(wb, monthlySheet, 'Monthly Trends');
+      }
+      
+      // Response time sheet
+      if (reportData.responseTimeData && reportData.responseTimeData.length > 0) {
+        const responseTimeSheet = XLSX.utils.json_to_sheet(
+          reportData.responseTimeData.map(item => ({
+            Category: item.name,
+            'Average Days': item.value
+          }))
+        );
+        XLSX.utils.book_append_sheet(wb, responseTimeSheet, 'Response Times');
+      }
+      
+      // Write file and download
+      XLSX.writeFile(wb, `${filename}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      throw new Error('Failed to export data');
+    }
+  }
+
+  // Helper functions
+  formatStatus(status) {
+    return status.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  }
+
+  getStatusColor(status) {
+    const STATUS_COLORS = {
+      'pending': '#FFBB28',
+      'in_progress': '#0088FE',
+      'completed': '#00C49F'
+    };
+    return STATUS_COLORS[status] || '#8884d8';
+  }
+}
+
+// Colors for charts
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
+const PRIORITY_COLORS = {
+  'low': '#82ca9d',
+  'normal': '#8884D8',
+  'high': '#FF8042',
+  'urgent': '#FF0000'
 };
 
-export default {
-  getRequests,
-  getRequestById,
-  createRequest,
-  updateRequest,
-  deleteRequest,
-  getRequestFiles,
-  getRequestComments,
-  addComment,
-  getRequestStatistics
-};
+export default new ReportService();

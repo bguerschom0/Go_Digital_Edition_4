@@ -1,508 +1,550 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Download,
+  Settings,
   Save,
+  PlayCircle,
+  Filter,
+  Download,
+  Trash2,
+  Edit,
   Plus,
-  X,
   Loader2
 } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
-
-// Import components
+import { useReports } from '../../hooks/useReports';
 import ReportFilters from '../../components/reports/ReportFilters';
-import ChartDisplay from '../../components/reports/ChartDisplay';
 import ReportTable from '../../components/reports/ReportTable';
-import SavedReportsList from '../../components/reports/SavedReportsList';
+import ReportChart from '../../components/reports/ReportChart';
+import ReportExport from '../../components/reports/ReportExport';
+import { format, subMonths } from 'date-fns';
 
 const CustomReports = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState([]);
-  const [reportType, setReportType] = useState('table');
-  const [chartField, setChartField] = useState('status');
-  const [reportName, setReportName] = useState('');
-  const [savedReports, setSavedReports] = useState([]);
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [organizations, setOrganizations] = useState([]);
+  const { 
+    runCustomReport, 
+    saveCustomReport, 
+    deleteCustomReport,
+    getUserSavedReports 
+  } = useReports();
   
-  // State for filters and fields
-  const [filters, setFilters] = useState({
-    dateRange: {
-      start: '',
-      end: ''
-    },
-    organization: 'all',
-    status: 'all',
-    priority: 'all'
+  // Default to last 6 months
+  const [dateRange, setDateRange] = useState({
+    start: format(subMonths(new Date(), 6), 'yyyy-MM-dd'),
+    end: format(new Date(), 'yyyy-MM-dd')
   });
   
-  const [fields, setFields] = useState([
-    { name: 'reference_number', label: 'Reference Number', selected: true },
-    { name: 'date_received', label: 'Date Received', selected: true },
-    { name: 'sender_name', label: 'Organization', selected: true },
-    { name: 'subject', label: 'Subject', selected: true },
-    { name: 'status', label: 'Status', selected: true },
-    { name: 'priority', label: 'Priority', selected: true },
-    { name: 'created_at', label: 'Created Date', selected: false },
-    { name: 'completed_at', label: 'Completed Date', selected: false },
-    { name: 'turnaround_days', label: 'Turnaround Time (days)', selected: false }
-  ]);
+  const [organizations, setOrganizations] = useState([]);
+  const [savedReports, setSavedReports] = useState([]);
+  const [reportName, setReportName] = useState('');
+  const [reportConfig, setReportConfig] = useState({
+    organizationId: 'all',
+    status: 'all',
+    priority: 'all',
+    groupBy: 'status',
+    chartType: 'pie'
+  });
   
-  // Get selected fields
-  const selectedFields = fields.filter(field => field.selected).map(field => field.name);
+  const [reportResults, setReportResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [error, setError] = useState(null);
   
-  // Fetch initial data
   useEffect(() => {
+    // Fetch organizations for filter
     const fetchOrganizations = async () => {
       try {
         const { data, error } = await supabase
-          .from('organizations')
+          .from('v4_organizations')
           .select('id, name')
           .order('name');
           
         if (error) throw error;
         setOrganizations(data || []);
-      } catch (error) {
-        console.error('Error fetching organizations:', error);
+      } catch (err) {
+        console.error('Error fetching organizations:', err);
       }
     };
     
+    // Fetch user's saved reports
     const fetchSavedReports = async () => {
       try {
-        // In a real app, you'd fetch saved reports from the database
-        // For now, we'll check local storage
-        const savedReportsString = localStorage.getItem('savedCustomReports');
-        if (savedReportsString) {
-          setSavedReports(JSON.parse(savedReportsString));
-        }
-      } catch (error) {
-        console.error('Error fetching saved reports:', error);
+        const reports = await getUserSavedReports(user.id);
+        setSavedReports(reports);
+      } catch (err) {
+        console.error('Error fetching saved reports:', err);
       }
     };
     
     fetchOrganizations();
     fetchSavedReports();
-  }, []);
+  }, [user.id, getUserSavedReports]);
   
-  // Generate report based on filters
-  const generateReport = async () => {
+  const handleConfigChange = (key, value) => {
+    setReportConfig(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+  
+  const handleRunReport = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      
-      // Build query
-      let query = supabase
-        .from('requests')
-        .select(`
-          *,
-          organizations:sender (name)
-        `);
-      
-      // Apply filters
-      if (filters.dateRange.start && filters.dateRange.end) {
-        query = query
-          .gte('date_received', filters.dateRange.start)
-          .lte('date_received', filters.dateRange.end);
-      } else if (filters.dateRange.start) {
-        query = query.gte('date_received', filters.dateRange.start);
-      } else if (filters.dateRange.end) {
-        query = query.lte('date_received', filters.dateRange.end);
-      }
-      
-      if (filters.organization !== 'all') {
-        query = query.eq('sender', filters.organization);
-      }
-      
-      if (filters.status !== 'all') {
-        query = query.eq('status', filters.status);
-      }
-      
-      if (filters.priority !== 'all') {
-        query = query.eq('priority', filters.priority);
-      }
-      
-      // Execute query
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      
-      // Process data
-      const processedData = data.map(request => {
-        // Calculate turnaround time
-        let turnaroundDays = null;
-        if (request.completed_at && request.created_at) {
-          turnaroundDays = Math.round(
-            (new Date(request.completed_at) - new Date(request.created_at)) / 
-            (1000 * 60 * 60 * 24)
-          );
-        }
-        
-        return {
-          ...request,
-          sender_name: request.organizations?.name || 'Unknown',
-          turnaround_days: turnaroundDays
-        };
+      const results = await runCustomReport({
+        ...reportConfig,
+        dateRange
       });
       
-      setReportData(processedData);
-    } catch (error) {
-      console.error('Error generating report:', error);
-      alert('Failed to generate report. Please try again.');
+      setReportResults(results);
+    } catch (err) {
+      console.error('Error running report:', err);
+      setError('Failed to run report. Please check your configuration and try again.');
     } finally {
       setLoading(false);
     }
   };
   
-  // Save report configuration
-  const saveReport = () => {
+  const handleSaveReport = async () => {
     if (!reportName.trim()) {
-      alert('Please enter a report name');
+      setError('Please enter a report name');
       return;
     }
     
-    const report = {
-      id: Date.now().toString(),
-      name: reportName,
-      filters,
-      fields: fields.map(f => ({ ...f })),
-      reportType,
-      chartField,
-      createdAt: new Date().toISOString()
-    };
+    setSaveLoading(true);
     
-    const updatedReports = [...savedReports, report];
-    setSavedReports(updatedReports);
-    
-    // Save to local storage (in a real app, you'd save to database)
-    localStorage.setItem('savedCustomReports', JSON.stringify(updatedReports));
-    
-    setShowSaveModal(false);
-    setReportName('');
-  };
-  
-  // Load saved report
-  const loadReport = (report) => {
-    setFilters(report.filters);
-    setFields(report.fields);
-    setReportType(report.reportType);
-    setChartField(report.chartField);
-    
-    // Generate report with loaded settings
-    generateReport();
-  };
-  
-  // Delete saved report
-  const deleteReport = (id) => {
-    const updatedReports = savedReports.filter(report => report.id !== id);
-    setSavedReports(updatedReports);
-    
-    // Update local storage
-    localStorage.setItem('savedCustomReports', JSON.stringify(updatedReports));
-  };
-  
-  // Export to Excel
-  const exportToExcel = () => {
     try {
-      // Prepare data for Excel
-      const exportData = reportData.map(item => {
-        const row = {};
-        
-        // Only include selected fields
-        selectedFields.forEach(field => {
-          if (field === 'date_received' || field === 'created_at' || field === 'completed_at') {
-            row[fields.find(f => f.name === field).label] = item[field] ? 
-              format(new Date(item[field]), 'yyyy-MM-dd') : '';
-          } else {
-            row[fields.find(f => f.name === field).label] = item[field];
-          }
-        });
-        
-        return row;
+      await saveCustomReport({
+        name: reportName,
+        config: {
+          ...reportConfig,
+          dateRange
+        },
+        userId: user.id
       });
       
-      // Create worksheet
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      // Refresh saved reports list
+      const reports = await getUserSavedReports(user.id);
+      setSavedReports(reports);
       
-      // Create workbook
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Custom Report');
-      
-      // Generate file name
-      const fileName = `custom_report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
-      
-      // Export to file
-      XLSX.writeFile(workbook, fileName);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('Failed to export data. Please try again.');
+      setReportName('');
+    } catch (err) {
+      console.error('Error saving report:', err);
+      setError('Failed to save report. Please try again.');
+    } finally {
+      setSaveLoading(false);
     }
   };
   
-  // Toggle field selection
-  const toggleField = (fieldName) => {
-    setFields(prev => 
-      prev.map(field => 
-        field.name === fieldName ? 
-          { ...field, selected: !field.selected } : 
-          field
-      )
-    );
+  const handleLoadReport = (report) => {
+    setReportConfig(report.config);
+    if (report.config.dateRange) {
+      setDateRange(report.config.dateRange);
+    }
+    handleRunReport();
+  };
+  
+  const handleDeleteReport = async (reportId) => {
+    if (!window.confirm('Are you sure you want to delete this saved report?')) {
+      return;
+    }
+    
+    try {
+      await deleteCustomReport(reportId);
+      
+      // Refresh saved reports list
+      const reports = await getUserSavedReports(user.id);
+      setSavedReports(reports);
+    } catch (err) {
+      console.error('Error deleting report:', err);
+      setError('Failed to delete report. Please try again.');
+    }
+  };
+  
+  const handleExport = (format) => {
+    if (!reportResults) return;
+    
+    const filename = `custom_report_${format(new Date(), 'yyyy-MM-dd')}`;
+    
+    // Export using the ReportExport component function
+    ReportExport.exportData({
+      data: reportResults,
+      filename,
+      format
+    });
+  };
+  
+  // Get appropriate chart based on groupBy
+  const getChartData = () => {
+    if (!reportResults || !reportResults.data) return [];
+    
+    return reportResults.data.map(item => ({
+      name: item.label,
+      value: item.value,
+      color: item.color
+    }));
   };
   
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Custom Reports
-              </h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Build and save custom reports with your own parameters
-              </p>
-            </div>
-            
-            <div className="flex gap-2">
-              {reportData.length > 0 && (
-                <button
-                  onClick={exportToExcel}
-                  className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </button>
-              )}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Custom Reports
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Create and run custom reports on your request data
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Configuration Panel */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Saved Reports */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+            >
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Save className="h-5 w-5 mr-2" />
+                Saved Reports
+              </h2>
               
-              {reportData.length > 0 && (
-                <button
-                  onClick={() => setShowSaveModal(true)}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg
-                         hover:bg-blue-700 transition-colors"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Report
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Main content area */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Sidebar: Filters and Fields */}
-            <div className="lg:col-span-1 space-y-6">
-              {/* Saved Reports */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
-              >
-                <SavedReportsList
-                  savedReports={savedReports}
-                  onLoadReport={loadReport}
-                  onDeleteReport={deleteReport}
-                />
-              </motion.div>
-              
-              {/* Filters */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
-              >
-                <ReportFilters
-                  filters={filters}
-                  organizations={organizations}
-                  onFilterChange={setFilters}
-                />
-              </motion.div>
-              
-              {/* Fields */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
-              >
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Report Fields
-                </h2>
-                
-                <div className="space-y-2">
-                  {fields.map((field) => (
-                    <div key={field.name} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`field-${field.name}`}
-                        checked={field.selected}
-                        onChange={() => toggleField(field.name)}
-                        className="h-4 w-4 text-black dark:text-white border-gray-300 dark:border-gray-700 
-                                 rounded focus:ring-black dark:focus:ring-white"
-                      />
-                      <label
-                        htmlFor={`field-${field.name}`}
-                        className="ml-2 text-sm text-gray-700 dark:text-gray-300"
-                      >
-                        {field.label}
-                      </label>
-                    </div>
+              {savedReports.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                  You don't have any saved reports yet.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {savedReports.map(report => (
+                    <li key={report.id} className="border dark:border-gray-700 rounded-lg p-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {report.name}
+                        </span>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleLoadReport(report)}
+                            className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                            title="Run report"
+                          >
+                            <PlayCircle className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReport(report.id)}
+                            className="p-1 text-red-600 hover:text-red-800 dark:text-red-400"
+                            title="Delete report"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Created: {new Date(report.created_at).toLocaleDateString()}
+                      </div>
+                    </li>
                   ))}
-                </div>
-              </motion.div>
+                </ul>
+              )}
+            </motion.div>
+            
+            {/* Report Configuration */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+            >
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Settings className="h-5 w-5 mr-2" />
+                Report Configuration
+              </h2>
               
-              {/* Chart Options */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
-              >
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Visualization
-                </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date Range
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={dateRange.start}
+                        onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={dateRange.end}
+                        onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
                 
                 <div>
-                  <ChartDisplay 
-                    reportType={reportType}
-                    setReportType={setReportType}
-                    chartField={chartField}
-                    setChartField={setChartField}
-                  />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Organization
+                  </label>
+                  <select
+                    value={reportConfig.organizationId}
+                    onChange={(e) => handleConfigChange('organizationId', e.target.value)}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="all">All Organizations</option>
+                    {organizations.map(org => (
+                      <option key={org.id} value={org.id}>{org.name}</option>
+                    ))}
+                  </select>
                 </div>
-              </motion.div>
-              
-              {/* Generate Report Button */}
-              <div className="flex justify-center">
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={reportConfig.status}
+                    onChange={(e) => handleConfigChange('status', e.target.value)}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={reportConfig.priority}
+                    onChange={(e) => handleConfigChange('priority', e.target.value)}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="all">All Priorities</option>
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Group By
+                  </label>
+                  <select
+                    value={reportConfig.groupBy}
+                    onChange={(e) => handleConfigChange('groupBy', e.target.value)}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="status">Status</option>
+                    <option value="priority">Priority</option>
+                    <option value="organization">Organization</option>
+                    <option value="month">Month</option>
+                    <option value="assigned_to">Assigned User</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Chart Type
+                  </label>
+                  <select
+                    value={reportConfig.chartType}
+                    onChange={(e) => handleConfigChange('chartType', e.target.value)}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="pie">Pie Chart</option>
+                    <option value="bar">Bar Chart</option>
+                    <option value="line">Line Chart (time-based only)</option>
+                  </select>
+                </div>
+                
                 <button
-                  onClick={generateReport}
+                  onClick={handleRunReport}
                   disabled={loading}
-                  className="w-full px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                           hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center 
-                           justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-2 px-4 bg-black dark:bg-white text-white dark:text-black rounded-lg
+                           hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors flex items-center justify-center"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
                     </>
                   ) : (
                     <>
-                      <Plus className="h-4 w-4" />
-                      Generate Report
+                      <PlayCircle className="h-4 w-4 mr-2" />
+                      Run Report
                     </>
                   )}
                 </button>
               </div>
-            </div>
+            </motion.div>
             
-            {/* Main Content Area: Report Results */}
-            <div className="lg:col-span-3">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
-              >
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  {reportType === 'table' ? 'Report Results' : 'Report Visualization'}
+            {/* Save Report */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6"
+            >
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Save className="h-5 w-5 mr-2" />
+                Save Report
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Report Name
+                  </label>
+                  <input
+                    type="text"
+                    value={reportName}
+                    onChange={(e) => setReportName(e.target.value)}
+                    placeholder="Enter a name for this report"
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                
+                <button
+                  onClick={handleSaveReport}
+                  disabled={saveLoading || !reportResults}
+                  className="w-full py-2 px-4 bg-black dark:bg-white text-white dark:text-black rounded-lg
+                           hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors flex items-center justify-center
+                           disabled:opacity-50"
+                >
+                  {saveLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Report
+                    </>
+                  )}
+                </button>
+                
+                {error && (
+                  <p className="text-red-500 text-sm mt-2">
+                    {error}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          </div>
+          
+          {/* Results Panel */}
+          <div className="lg:col-span-2">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 h-full"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Report Results
                 </h2>
                 
-                {loading ? (
-                  <div className="flex justify-center items-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                    <span className="ml-2 text-gray-500 dark:text-gray-400">Generating report...</span>
-                  </div>
-                ) : reportData.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <p className="text-gray-500 dark:text-gray-400 mb-4">
-                      No data available. Adjust your filters or generate a report.
-                    </p>
-                    <button
-                      onClick={generateReport}
-                      className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                                hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
-                    >
-                      Generate Report
-                    </button>
-                  </div>
-                ) : reportType === 'table' ? (
-                  <ReportTable 
-                    reportData={reportData}
-                    fields={fields.filter(f => f.selected)}
-                  />
-                ) : (
-                  <ChartDisplay 
-                    reportType={reportType}
-                    chartField={chartField}
-                    reportData={reportData}
-                    isPreview={false}
-                  />
+                {reportResults && (
+                  <button
+                    onClick={() => handleExport('excel')}
+                    className="flex items-center px-3 py-1.5 bg-green-600 text-white rounded-lg
+                             hover:bg-green-700 transition-colors text-sm"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Export
+                  </button>
                 )}
-              </motion.div>
-            </div>
+              </div>
+              
+              {loading ? (
+                <div className="flex justify-center items-center h-64">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                </div>
+              ) : !reportResults ? (
+                <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
+                  <Filter className="h-12 w-12 mb-4" />
+                  <p className="text-lg">Configure and run a report to see results</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Chart visualization */}
+                  <div className="h-64 mb-6">
+                    <ReportChart 
+                      type={reportConfig.chartType}
+                      data={getChartData()}
+                      dataKey="value"
+                      nameKey="name"
+                      layout={reportConfig.chartType === 'bar' ? 'vertical' : undefined}
+                    />
+                  </div>
+                  
+                  {/* Data table */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            {reportConfig.groupBy === 'month' ? 'Month' : 'Category'}
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Count
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Percentage
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {reportResults.data.map((item, index) => (
+                          <tr key={index}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                              {item.label}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              {item.value}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              {((item.value / reportResults.total) * 100).toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <td className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                            Total
+                          </td>
+                          <td className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300">
+                            {reportResults.total}
+                          </td>
+                          <td className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300">
+                            100%
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </motion.div>
           </div>
         </div>
       </div>
-      
-      {/* Save Report Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Save Report
-              </h3>
-              <button
-                onClick={() => setShowSaveModal(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Save this report configuration to access it later.
-            </p>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Report Name
-              </label>
-              <input
-                type="text"
-                value={reportName}
-                onChange={(e) => setReportName(e.target.value)}
-                placeholder="Enter a name for this report"
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-              />
-            </div>
-            
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowSaveModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg
-                         hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveReport}
-                className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
-              >
-                Save Report
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

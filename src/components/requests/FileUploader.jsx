@@ -3,7 +3,7 @@ import { Upload, X, AlertCircle, File, Check, Loader2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../config/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { applyPdfSecurity } from '../../services/pdfSecurityService';
+import { applyPdfSecurity, isPdfFile } from '../../services/pdfSecurityService';
 
 const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false }) => {
   const { user } = useAuth();
@@ -107,15 +107,42 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
     // Create a copy of files to track progress
     const filesCopy = [...files];
     
+    // Check if bucket exists before attempting uploads
+    try {
+      // Verify the bucket exists
+      const { error: bucketError } = await supabase.storage.getBucket('request-files');
+      
+      if (bucketError && bucketError.message.includes("Bucket not found")) {
+        // Create the bucket if it doesn't exist
+        console.log("Bucket 'request-files' not found, creating it now...");
+        
+        const { error: createBucketError } = await supabase.storage.createBucket('request-files', {
+          public: false,
+          fileSizeLimit: 50 * 1024 * 1024 // 50MB
+        });
+        
+        if (createBucketError) {
+          throw new Error(`Error creating bucket: ${createBucketError.message}`);
+        }
+      } else if (bucketError) {
+        throw bucketError;
+      }
+    } catch (bucketError) {
+      console.error('Error with storage bucket:', bucketError);
+      setError(`Storage configuration error: ${bucketError.message}. Please contact support.`);
+      setUploading(false);
+      return;
+    }
+
     for (let i = 0; i < filesCopy.length; i++) {
       const { file, id } = filesCopy[i];
       
       try {
-        // If it's a PDF, apply security settings
+        // If it's a PDF, try to apply security settings
         let fileToUpload = file;
         let isSecured = false;
         
-        if (file.type === 'application/pdf' && isResponseUpload) {
+        if (isPdfFile(file) && isResponseUpload) {
           try {
             // Update progress to show processing
             setUploadProgress(prev => ({
@@ -123,9 +150,12 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
               [id]: { progress: 0, status: 'processing' }
             }));
             
-            // Apply PDF security
-            fileToUpload = await applyPdfSecurity(file);
-            isSecured = true;
+            // Try to apply PDF security - if it fails, just use the original file
+            const securedFile = await applyPdfSecurity(file);
+            if (securedFile) {
+              fileToUpload = securedFile;
+              isSecured = true;
+            }
             
             // Update progress after processing
             setUploadProgress(prev => ({

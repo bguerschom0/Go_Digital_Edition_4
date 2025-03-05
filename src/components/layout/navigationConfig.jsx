@@ -60,6 +60,22 @@ export const roleBasedNavigation = {
         }
       ]
     },
+      name: 'Dashboards',
+      path: '',
+      icon: LayoutDashboard,
+      children: [
+        {
+          name: 'Organization Dashboard',
+          path: '/orgdashboard',
+          icon: LayoutDashboard
+        },
+        {
+          name: 'User Dashboard',
+          path: '/userdashboard',
+          icon: LayoutDashboard
+        }
+      ]
+    },
     {
       name: 'User Management',
       path: '/user-management',

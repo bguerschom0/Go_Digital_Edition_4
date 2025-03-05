@@ -143,97 +143,19 @@ const RequestList = () => {
     fetchRequests();
     fetchOrganizations();
 
-    // Set up real-time subscription for request changes
-    const requestSubscription = supabase
-      .channel('public:v4_requests_changes')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'v4_requests'
-      }, (payload) => {
-        if (!isMounted) return;
-        
-        // For new requests, fetch the complete record with relations
-        supabase
-          .from('v4_requests')
-          .select(`
-            *,
-            v4_organizations:sender (name),
-            v4_request_files!v4_request_files_request_id_fkey (id),
-            v4_comments!v4_comments_request_id_fkey (id)
-          `)
-          .eq('id', payload.new.id)
-          .single()
-          .then(({ data, error }) => {
-            if (!isMounted) return;
-            
-            if (!error && data) {
-              const newRequest = {
-                ...data,
-                sender_name: data.v4_organizations?.name || 'Unknown',
-                files_count: data.v4_request_files ? data.v4_request_files.length : 0,
-                comments_count: data.v4_comments ? data.v4_comments.length : 0
-              };
-              
-              setRequests(prev => [newRequest, ...prev]);
-            }
-          });
-      })
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'v4_requests'
-      }, (payload) => {
-        if (!isMounted) return;
-        
-        // For updates, fetch the complete updated record
-        supabase
-          .from('v4_requests')
-          .select(`
-            *,
-            v4_organizations:sender (name),
-            v4_request_files!v4_request_files_request_id_fkey (id),
-            v4_comments!v4_comments_request_id_fkey (id)
-          `)
-          .eq('id', payload.new.id)
-          .single()
-          .then(({ data, error }) => {
-            if (!isMounted) return;
-            
-            if (!error && data) {
-              const updatedRequest = {
-                ...data,
-                sender_name: data.v4_organizations?.name || 'Unknown',
-                files_count: data.v4_request_files ? data.v4_request_files.length : 0,
-                comments_count: data.v4_comments ? data.v4_comments.length : 0
-              };
-              
-              setRequests(prev => 
-                prev.map(request => 
-                  request.id === updatedRequest.id ? updatedRequest : request
-                )
-              );
-            }
-          });
-      })
-      .on('postgres_changes', { 
-        event: 'DELETE', 
-        schema: 'public', 
-        table: 'v4_requests'
-      }, (payload) => {
-        if (!isMounted) return;
-        
-        // For deletions, remove from state
-        setRequests(prev => 
-          prev.filter(request => request.id !== payload.old.id)
-        );
-      })
-      .subscribe();
+        // Set up a refresh interval instead of real-time subscription
+    // This will refresh the data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted) {
+        console.log('Auto-refreshing requests data');
+        fetchRequests();
+      }
+    }, 30000);
 
     // Cleanup function
     return () => {
       isMounted = false;
-      supabase.removeChannel(requestSubscription);
+      clearInterval(refreshInterval);
     };
   }, [isRestrictedToOrganization, userOrganizations]);
 

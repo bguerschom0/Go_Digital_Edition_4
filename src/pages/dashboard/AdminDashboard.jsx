@@ -76,7 +76,7 @@ const AdminDashboard = () => {
       // Fetch user role distribution
       const { data: roleData } = await supabase
         .from('users')
-        .select('role');
+        .select('user_role_v4');
 
       // Process role distribution data
       const roleCounts = roleData.reduce((acc, { role }) => {
@@ -91,30 +91,30 @@ const AdminDashboard = () => {
 
       // Fetch request statistics
       const { count: totalRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' });
 
       // Fetch pending requests
       const { count: pendingRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('status', 'pending');
 
       // Fetch completed requests
       const { count: completedRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('status', 'completed');
 
       // Fetch urgent requests
       const { count: urgentRequests } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('*', { count: 'exact' })
         .eq('priority', 'urgent');
 
       // Fetch request status distribution
       const { data: statusData } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select('status');
 
       // Process status distribution data
@@ -131,7 +131,7 @@ const AdminDashboard = () => {
 
       // Fetch recent requests
       const { data: recentRequestsData } = await supabase
-        .from('requests')
+        .from('v4_requests')
         .select(`
           id,
           reference_number,

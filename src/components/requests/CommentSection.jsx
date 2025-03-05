@@ -30,7 +30,7 @@ const CommentSection = ({ requestId }) => {
               id,
               full_name,
               username,
-              User_Role_V4
+              user_role_v4
             )
           `)
           .eq('request_id', requestId)
@@ -70,7 +70,7 @@ const CommentSection = ({ requestId }) => {
                 id,
                 full_name,
                 username,
-                User_Role_V4
+                user_role_v4
               )
             `)
             .eq('id', payload.new.id)
@@ -194,7 +194,7 @@ const CommentSection = ({ requestId }) => {
                 }`}
               >
                 {comment.user_id !== user.id && (
-                  <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getUserAvatarColor(comment.users.User_Role_V4)}`}>
+                  <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getUserAvatarColor(comment.users.user_role_v4)}`}>
                     <UserCircle className="h-5 w-5" />
                   </div>
                 )}
@@ -207,9 +207,9 @@ const CommentSection = ({ requestId }) => {
                   <div className="flex justify-between items-start gap-2 mb-1">
                     <span className="text-xs font-medium">
                       {comment.user_id === user.id ? 'You' : comment.users.full_name}
-                      {comment.users.User_Role_V4 && (
+                      {comment.users.user_role_v4 && (
                         <span className="ml-1 opacity-70">
-                          ({getRoleDisplayName(comment.users.User_Role_V4)})
+                          ({getRoleDisplayName(comment.users.user_role_v4)})
                         </span>
                       )}
                     </span>

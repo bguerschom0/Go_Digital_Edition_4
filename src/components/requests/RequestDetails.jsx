@@ -1,23 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { 
   Calendar, 
-  Clock, 
   FileText, 
   MessageSquare,
   Download,
-  CheckCircle,
-  AlertCircle,
   User,
-  Building,
-  Tag,
-  ClipboardList,
-  AlertTriangle,
-  Flag,
-  X,
-  Check,
   Loader2,
-  Edit2
+  AlertCircle,
+  Edit2,
+  X,
+  Check
 } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -25,7 +17,7 @@ import FileUploader from './FileUploader';
 import CommentSection from './CommentSection';
 import { format, formatDistanceToNow } from 'date-fns';
 
-const RequestDetails = ({ requestId, onClose }) => {
+const RequestDetails = ({ requestId, onClose, canEdit, onUpdate }) => {
   const { user } = useAuth();
   const [request, setRequest] = useState(null);
   const [requestFiles, setRequestFiles] = useState([]);
@@ -34,7 +26,6 @@ const RequestDetails = ({ requestId, onClose }) => {
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
-  const [orgData, setOrgData] = useState(null);
   
   // Fetch request data
   useEffect(() => {
@@ -47,10 +38,7 @@ const RequestDetails = ({ requestId, onClose }) => {
           .from('v4_requests')
           .select(`
             *,
-            organizations:sender (id, name, contact_person, email, phone),
-            created_by_user:created_by (full_name, username),
-            assigned_to_user:assigned_to (full_name, username),
-            updated_by_user:updated_by (full_name, username)
+            created_by_user:created_by (full_name, username)
           `)
           .eq('id', requestId)
           .single();
@@ -70,23 +58,12 @@ const RequestDetails = ({ requestId, onClose }) => {
         if (filesError) throw filesError;
         
         // Organize request data
-        setRequest({
-          ...requestData,
-          sender_name: requestData.organizations.name,
-          sender_org: requestData.organizations
-        });
-        
-        setOrgData(requestData.organizations);
+        setRequest(requestData);
         setRequestFiles(filesData || []);
         
-        // Initialize edit data
+        // Initialize edit data (only status field for simplified editing)
         setEditData({
-          subject: requestData.subject,
-          description: requestData.description,
-          status: requestData.status,
-          priority: requestData.priority,
-          sender: requestData.sender,
-          date_received: requestData.date_received
+          status: requestData.status
         });
         
       } catch (error) {
@@ -127,24 +104,9 @@ const RequestDetails = ({ requestId, onClose }) => {
         fetchFiles();
       })
       .subscribe();
-      
-    // Set up real-time subscription for request updates
-    const requestSubscription = supabase
-      .channel('public:v4_requests')
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'v4_requests',
-        filter: `id=eq.${requestId}`
-      }, () => {
-        // Refetch request when it's updated
-        fetchRequestData();
-      })
-      .subscribe();
 
     return () => {
       supabase.removeChannel(fileSubscription);
-      supabase.removeChannel(requestSubscription);
     };
   }, [requestId]);
 
@@ -172,7 +134,7 @@ const RequestDetails = ({ requestId, onClose }) => {
     }
   };
 
-  // Update request data
+  // Update request status
   const handleSaveChanges = async () => {
     try {
       setSaving(true);
@@ -180,12 +142,7 @@ const RequestDetails = ({ requestId, onClose }) => {
       const { error } = await supabase
         .from('v4_requests')
         .update({
-          subject: editData.subject,
-          description: editData.description,
           status: editData.status,
-          priority: editData.priority,
-          sender: editData.sender,
-          date_received: editData.date_received,
           updated_by: user.id,
           updated_at: new Date().toISOString()
         })
@@ -194,9 +151,14 @@ const RequestDetails = ({ requestId, onClose }) => {
       if (error) throw error;
       
       setEditing(false);
+      
+      // Call update callback
+      if (onUpdate) {
+        onUpdate();
+      }
     } catch (error) {
       console.error('Error updating request:', error);
-      alert('Failed to update request. Please try again.');
+      alert('Failed to update request status. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -229,39 +191,18 @@ const RequestDetails = ({ requestId, onClose }) => {
     ).join(' ');
   };
 
-  // Get priority color and icon
-  const getPriorityInfo = (priority) => {
+  // Get priority badge color
+  const getPriorityBadgeColor = (priority) => {
     switch(priority) {
       case 'low':
-        return { 
-          color: 'text-blue-600 dark:text-blue-400', 
-          bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-          icon: <Flag className="h-4 w-4" />
-        };
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200';
       case 'high':
-        return { 
-          color: 'text-orange-600 dark:text-orange-400', 
-          bgColor: 'bg-orange-100 dark:bg-orange-900/30',
-          icon: <Flag className="h-4 w-4" />
-        };
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200';
       case 'urgent':
-        return { 
-          color: 'text-red-600 dark:text-red-400', 
-          bgColor: 'bg-red-100 dark:bg-red-900/30',
-          icon: <AlertTriangle className="h-4 w-4" />
-        };
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200';
       default: // normal
-        return { 
-          color: 'text-gray-600 dark:text-gray-400', 
-          bgColor: 'bg-gray-100 dark:bg-gray-800',
-          icon: <Flag className="h-4 w-4" />
-        };
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-800/80 dark:text-gray-300';
     }
-  };
-
-  // Check if user can edit this request
-  const canEdit = () => {
-    return user.role === 'administrator' || user.role === 'user';
   };
 
   // Check if user can upload files
@@ -299,27 +240,11 @@ const RequestDetails = ({ requestId, onClose }) => {
     );
   }
 
-  const priorityInfo = getPriorityInfo(request.priority);
-
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-      {/* Header with close button */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Request Details
-        </h2>
-        <button
-          onClick={onClose}
-          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-        >
-          <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-        </button>
-      </div>
-      
-      {/* Request content */}
-      <div className="p-6">
-        {/* Header with reference number and status */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      {/* Request header */}
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               {request.reference_number}
@@ -330,258 +255,74 @@ const RequestDetails = ({ requestId, onClose }) => {
                 Received: {format(new Date(request.date_received), 'PPP')}
               </span>
             </div>
+            <div className="flex items-center gap-2 mt-1">
+              <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                Created by: {request.created_by_user?.full_name || 'Unknown'}
+              </span>
+            </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
             {/* Priority badge */}
-            <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium
-                           ${priorityInfo.bgColor} ${priorityInfo.color}`}>
-              {priorityInfo.icon}
-              <span>{request.priority.charAt(0).toUpperCase() + request.priority.slice(1)} Priority</span>
+            <div className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityBadgeColor(request.priority)}`}>
+              {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)} Priority
             </div>
             
-            {/* Status badge */}
-            <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-              {formatStatus(request.status)}
-            </div>
-            
-            {/* Edit button (only for admin and user) */}
-            {canEdit() && !editing && (
-              <button
-                onClick={() => setEditing(true)}
-                className="ml-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 
-                         dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700
-                         transition-colors"
-              >
-                <Edit2 className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-        </div>
-        
-        {/* Request details */}
-        {editing ? (
-          /* Edit form */
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Subject / Request Type*
-              </label>
-              <input
-                type="text"
-                name="subject"
-                value={editData.subject}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={editData.description || ''}
-                onChange={handleInputChange}
-                rows="3"
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Status
-                </label>
+            {/* Status badge/dropdown */}
+            {editing ? (
+              <div className="flex items-center gap-2">
                 <select
                   name="status"
                   value={editData.status}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                  className="px-3 py-1 rounded border border-gray-200 dark:border-gray-700
+                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs
                            focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
                 >
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
                   <option value="completed">Completed</option>
                 </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Priority
-                </label>
-                <select
-                  name="priority"
-                  value={editData.priority}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                           focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={saving}
+                  className="p-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded-full"
                 >
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
+                  <Check className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="p-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-full"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Received
-                </label>
-                <input
-                  type="date"
-                  name="date_received"
-                  value={editData.date_received}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                           focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-4 pt-2">
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                disabled={saving}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 
-                         dark:hover:text-white transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveChanges}
-                disabled={saving}
-                className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg
-                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
-                         flex items-center gap-2 disabled:opacity-50"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Save Changes
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Display mode */
-          <div className="space-y-6">
-            {/* Subject and description */}
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                {request.subject}
-              </h2>
-              {request.description && (
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                  {request.description}
-                </p>
-              )}
-            </div>
-            
-            {/* Organization info */}
-            <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center">
-                <Building className="h-4 w-4 mr-2" />
-                Sender Organization
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {request.sender_name}
-                  </p>
-                  {orgData?.contact_person && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 flex items-center">
-                      <User className="h-3.5 w-3.5 mr-1 text-gray-500 dark:text-gray-400" />
-                      {orgData.contact_person}
-                    </p>
-                  )}
+            ) : (
+              <>
+                <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                  {formatStatus(request.status)}
                 </div>
                 
-                <div>
-                  {orgData?.email && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      Email: {orgData.email}
-                    </p>
-                  )}
-                  {orgData?.phone && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      Phone: {orgData.phone}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* Meta information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center">
-                  <ClipboardList className="h-4 w-4 mr-1" />
-                  Request Information
-                </h3>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    <span className="font-medium">Created by:</span>{' '}
-                    {request.created_by_user?.full_name || 'Unknown'}
-                  </p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    <span className="font-medium">Created on:</span>{' '}
-                    {format(new Date(request.created_at), 'PPP')}
-                  </p>
-                  {request.updated_by && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">Last updated by:</span>{' '}
-                      {request.updated_by_user?.full_name || 'Unknown'},{' '}
-                      {formatDistanceToNow(new Date(request.updated_at), { addSuffix: true })}
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center">
-                  <Tag className="h-4 w-4 mr-1" />
-                  Additional Information
-                </h3>
-                <div className="space-y-2">
-                  {request.is_duplicate && (
-                    <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                      This request has a duplicate reference number.
-                    </p>
-                  )}
-                  {request.status === 'completed' && request.deletion_date && (
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      <span className="font-medium">Auto-deletion date:</span>{' '}
-                      {format(new Date(request.deletion_date), 'PPP')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+                {/* Edit button (only if canEdit is true) */}
+                {canEdit && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 
+                             dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700
+                             transition-colors"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                )}
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
       
       {/* Files Section */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
           <FileText className="h-5 w-5 mr-2" />
           Documents
@@ -697,7 +438,7 @@ const RequestDetails = ({ requestId, onClose }) => {
       </div>
       
       {/* Comments section */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+      <div className="p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
           <MessageSquare className="h-5 w-5 mr-2" />
           Discussion

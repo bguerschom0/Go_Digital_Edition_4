@@ -11,36 +11,46 @@ export const applyPdfSecurity = async (file) => {
     // Read the file as an ArrayBuffer
     const fileBuffer = await file.arrayBuffer();
     
-    // Load the PDF document
-    const pdfDoc = await PDFDocument.load(fileBuffer);
-    
-    // Create a random owner password
-    const ownerPassword = generateRandomPassword(16);
-    
-    // Set PDF security options
-    // userPassword: null = no password required to open the document
-    // ownerPassword: required to change permissions or unlock features
-    // permissions: specify what users can do with the document
-    pdfDoc.encrypt({
-      userPassword: null,
-      ownerPassword: ownerPassword,
-      permissions: {
-        // Allow printing but disable other features
-        printing: 'highResolution',
-        modifying: false,
-        copying: false,
-        annotating: false,
-        fillingForms: false,
-        contentAccessibility: true,
-        documentAssembly: false
-      },
-    });
-    
-    // Save the document
-    const securedPdfBytes = await pdfDoc.save();
-    
-    // Convert to Blob and return
-    return new Blob([securedPdfBytes], { type: 'application/pdf' });
+    try {
+      // Load the PDF document
+      const pdfDoc = await PDFDocument.load(fileBuffer);
+      
+      // Check if the document has encryption features available
+      if (typeof pdfDoc.encrypt !== 'function') {
+        console.warn('PDF encryption not supported in this PDF document or library version');
+        // Return the original file if encryption is not supported
+        return file;
+      }
+      
+      // Create a random owner password
+      const ownerPassword = generateRandomPassword(16);
+      
+      // Set PDF security options
+      pdfDoc.encrypt({
+        userPassword: null,
+        ownerPassword: ownerPassword,
+        permissions: {
+          // Allow printing but disable other features
+          printing: 'highResolution',
+          modifying: false,
+          copying: false,
+          annotating: false,
+          fillingForms: false,
+          contentAccessibility: true,
+          documentAssembly: false
+        },
+      });
+      
+      // Save the document
+      const securedPdfBytes = await pdfDoc.save();
+      
+      // Convert to Blob and return
+      return new Blob([securedPdfBytes], { type: 'application/pdf' });
+    } catch (encryptError) {
+      console.error('PDF encryption error:', encryptError);
+      // Return the original file if there's an encryption error
+      return file;
+    }
   } catch (error) {
     console.error('Error securing PDF:', error);
     throw new Error('Failed to apply security to PDF. Please try a different file.');

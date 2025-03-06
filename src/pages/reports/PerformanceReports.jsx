@@ -80,7 +80,7 @@ const PerformanceReports = () => {
           priority,
           date_received,
           completed_at,
-          organization_id,
+          v4_user_organizations(organization_id),
           v4_organizations(id, name)
         `)
         .gte('date_received', dateRange.start)

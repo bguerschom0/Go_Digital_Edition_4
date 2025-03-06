@@ -119,12 +119,11 @@ const RequestReports = () => {
       setError(null);
       
       // 1. Status Distribution Query
-      let statusQuery = supabase
-        .from('v4_requests')
-        .select('status, count(*)', { count: 'exact' })
-        .gte('date_received', filters.dateRange.start)
-        .lte('date_received', filters.dateRange.end)
-        .groupBy('status');
+let statusQuery = supabase
+  .from('v4_requests')
+  .select('status', { count: 'exact' })
+  .gte('date_received', filters.dateRange.start)
+  .lte('date_received', filters.dateRange.end);
         
       // Apply organization filter if not 'all'
       if (filters.organization !== 'all') {
@@ -157,26 +156,24 @@ const RequestReports = () => {
       setInProgressRequests(inProgressCount);
       
       // 2. Organization Distribution Query
-      let orgQuery = supabase
-        .from('v4_requests')
-        .select(`
-          sender,
-          organizations:sender (name),
-          count(*)
-        `)
-        .gte('date_received', filters.dateRange.start)
-        .lte('date_received', filters.dateRange.end)
-        .groupBy('sender, organizations(name)');
-        
-      const { data: orgResults, error: orgError } = await orgQuery;
-      if (orgError) throw orgError;
-      
-      // Format organization data
-      const formattedOrgData = orgResults.map((item, index) => ({
-        name: item.organizations?.name || 'Unknown',
-        value: parseInt(item.count),
-        color: COLORS[index % COLORS.length]
-      }))
+let orgQuery = supabase
+  .from('v4_requests')
+  .select('sender')
+  .gte('date_received', filters.dateRange.start)
+  .lte('date_received', filters.dateRange.end);
+
+// Then process the results manually
+const orgCounts = orgResults.reduce((acc, item) => {
+  const orgName = item.organizations?.name || 'Unknown';
+  acc[orgName] = (acc[orgName] || 0) + 1;
+  return acc;
+}, {});
+
+const formattedOrgData = Object.entries(orgCounts).map(([name, value], index) => ({
+  name,
+  value,
+  color: COLORS[index % COLORS.length]
+}));
       .sort((a, b) => {
         if (sortConfig.key === 'name') {
           return sortConfig.direction === 'asc' 
@@ -411,6 +408,18 @@ const RequestReports = () => {
   const formatNumber = (num) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
+
+  // Modify how you process the status results
+const formattedStatusData = Object.entries(
+  statusResults.reduce((acc, item) => {
+    acc[item.status] = (acc[item.status] || 0) + 1;
+    return acc;
+  }, {})
+).map(([status, count]) => ({
+  name: formatStatus(status),
+  value: count,
+  color: STATUS_COLORS[status] || '#8884D8'
+}));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">

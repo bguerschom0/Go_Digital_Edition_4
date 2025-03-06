@@ -98,22 +98,25 @@ const OrganizationReports = () => {
   }, [selectedOrganization, organizations, statusDistribution, summaryMetrics]);
   
 
-  
-
-  // Fetch organizations list
-  useEffect(() => {
-
-    const fetchRecentRequests = async () => {
+  const fetchRecentRequests = async () => {
+    try {
       const { data, error } = await supabase
         .from('v4_requests')
         .select('id, reference_number, date_received, subject, status, completed_at')
         .eq('sender', selectedOrganization)
         .order('date_received', { ascending: false })
         .limit(10);
-    
+      
       if (error) throw error;
       setRecentRequests(data || []);
-    };
+    } catch (err) {
+      console.error('Error fetching recent requests:', err);
+    }
+  };
+
+  // Fetch organizations list
+  useEffect(() => {
+
     
     // Add to Promise.all array:
     fetchRecentRequests()

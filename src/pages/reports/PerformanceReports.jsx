@@ -70,7 +70,7 @@ const PerformanceReports = () => {
     fetchReportData();
   }, [dateRange, reportType]);
   
-  // Fetch response time data - MODIFIED TO USE DIRECT QUERIES
+  // Fetch response time data
   const fetchResponseTimeData = async () => {
     try {
       // Fetch requests with date_received and completed_at
@@ -80,8 +80,8 @@ const PerformanceReports = () => {
           priority,
           date_received,
           completed_at,
-          v4_user_organizations(organization_id),
-          v4_organizations(id, name)
+          sender,
+          v4_organizations:sender(id, name)
         `)
         .gte('date_received', dateRange.start)
         .lte('date_received', dateRange.end)
@@ -96,7 +96,7 @@ const PerformanceReports = () => {
       // Calculate average response time by priority
       const priorityGroups = {};
       requestsData.forEach(request => {
-        const priority = request.priority || 'unknown';
+        const priority = request.priority || 'normal';
         if (!priorityGroups[priority]) {
           priorityGroups[priority] = { total: 0, count: 0 };
         }
@@ -110,6 +110,12 @@ const PerformanceReports = () => {
         priority,
         avg_days: data.count > 0 ? parseFloat((data.total / data.count).toFixed(2)) : 0
       }));
+      
+      // Sort priority data by urgency
+      priorityData.sort((a, b) => {
+        const priorityOrder = { 'urgent': 0, 'high': 1, 'normal': 2, 'low': 3 };
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      });
       
       // Calculate average response time by organization
       const orgGroups = {};
@@ -145,64 +151,75 @@ const PerformanceReports = () => {
     }
   };
   
-  // Fetch user performance data - THIS STAYS THE SAME
+  // Fetch user performance data
   const fetchUserPerformanceData = async () => {
-    // Requests processed by user
-    const { data: userData, error: userError } = await supabase
-      .from('v4_requests')
-      .select(`
-        assigned_to,
-        users!assigned_to(full_name),
-        status
-      `)
-      .gte('date_received', dateRange.start)
-      .lte('date_received', dateRange.end)
-      .not('assigned_to', 'is', null);
-      
-    if (userError) {
-      console.error('Error fetching user performance:', userError);
-      return;
-    }
-    
-    // Group and aggregate data
-    const userStats = {};
-    userData?.forEach(item => {
-      const userId = item.assigned_to;
-      const userName = item.users?.full_name || 'Unknown';
-      
-      if (!userStats[userId]) {
-        userStats[userId] = {
-          user_id: userId,
-          name: userName,
-          total: 0,
-          completed: 0,
-          pending: 0,
-          in_progress: 0
-        };
+    try {
+      // Requests processed by user
+      const { data: userData, error: userError } = await supabase
+        .from('v4_requests')
+        .select(`
+          assigned_to,
+          users!assigned_to(full_name),
+          status
+        `)
+        .gte('date_received', dateRange.start)
+        .lte('date_received', dateRange.end)
+        .not('assigned_to', 'is', null);
+        
+      if (userError) {
+        console.error('Error fetching user performance:', userError);
+        setUserPerformance([]);
+        return;
       }
       
-      userStats[userId].total += 1;
+      // Group and aggregate data
+      const userStats = {};
+      userData?.forEach(item => {
+        const userId = item.assigned_to;
+        const userName = item.users?.full_name || 'Unknown';
+        
+        if (!userStats[userId]) {
+          userStats[userId] = {
+            user_id: userId,
+            name: userName,
+            total: 0,
+            completed: 0,
+            pending: 0,
+            in_progress: 0
+          };
+        }
+        
+        userStats[userId].total += 1;
+        
+        // Increment the appropriate status counter
+        if (item.status === 'completed') {
+          userStats[userId].completed += 1;
+        } else if (item.status === 'pending') {
+          userStats[userId].pending += 1;
+        } else if (item.status === 'in_progress') {
+          userStats[userId].in_progress += 1;
+        }
+      });
       
-      // Increment status counter (defaulting to 0 if status doesn't exist yet)
-      const status = item.status || 'pending';
-      userStats[userId][status] = (userStats[userId][status] || 0) + 1;
-    });
-    
-    // Convert to array and add completion rate
-    const userPerformanceArray = Object.values(userStats).map(user => ({
-      ...user,
-      completion_rate: user.total > 0 
-        ? Math.round((user.completed / user.total) * 100) 
-        : 0
-    }));
-    
-    // Sort by total requests
-    userPerformanceArray.sort((a, b) => b.total - a.total);
-    
-    setUserPerformance(userPerformanceArray);
+      // Convert to array and add completion rate
+      const userPerformanceArray = Object.values(userStats).map(user => ({
+        ...user,
+        completion_rate: user.total > 0 
+          ? Math.round((user.completed / user.total) * 100) 
+          : 0
+      }));
+      
+      // Sort by total requests
+      userPerformanceArray.sort((a, b) => b.total - a.total);
+      
+      setUserPerformance(userPerformanceArray);
+    } catch (error) {
+      console.error('Error processing user performance data:', error);
+      setUserPerformance([]);
+    }
   };
   
-  // Fetch volume trend data - MODIFIED TO USE DIRECT QUERY
+  // Fetch volume trend data
   const fetchVolumeData = async () => {
     try {
       // Fetch requests grouped by date_received
@@ -221,7 +238,8 @@ const PerformanceReports = () => {
       // Group by month
       const monthlyGroups = {};
       requestsData.forEach(request => {
-        const monthKey = format(parseISO(request.date_received), 'yyyy-MM');
+        // Format to YYYY-MM for grouping
+        const monthKey = request.date_received.substring(0, 7);
         if (!monthlyGroups[monthKey]) {
           monthlyGroups[monthKey] = { count: 0 };
         }
@@ -231,7 +249,7 @@ const PerformanceReports = () => {
       // Convert to array for chart
       const formattedData = Object.entries(monthlyGroups)
         .map(([month, data]) => ({
-          month: format(parseISO(`${month}-01`), 'MMM yyyy'),
+          month: format(new Date(`${month}-01`), 'MMM yyyy'),
           count: data.count
         }))
         .sort((a, b) => {
@@ -250,7 +268,27 @@ const PerformanceReports = () => {
   
   // Export report data
   const handleExport = (format) => {
-    // Implementation...
+    let exportData;
+    
+    switch (reportType) {
+      case 'response_time':
+        exportData = {
+          priorityData: responseTimeData.priorityData,
+          orgData: responseTimeData.orgData
+        };
+        break;
+      case 'user_performance':
+        exportData = userPerformance;
+        break;
+      case 'volume_trends':
+        exportData = volumeData;
+        break;
+      default:
+        exportData = {};
+    }
+    
+    // Pass the data to ReportExport component which should handle the export logic
+    console.log(`Exporting ${reportType} data in ${format} format`);
   };
   
   // Report title based on type

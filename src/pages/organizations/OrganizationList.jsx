@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   Building, 
   Search, 
@@ -12,6 +12,7 @@ import {
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ModalOrganizationUsers from '../../components/modals/ModalOrganizationUsers';
+import ModalOrganizationDetail from '../../components/modals/ModalOrganizationDetail';
 
 const OrganizationList = () => {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ const OrganizationList = () => {
   
   // Modal states
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedOrgId, setSelectedOrgId] = useState(null);
 
   useEffect(() => {
@@ -72,9 +74,20 @@ const OrganizationList = () => {
     }
   };
 
+  // Handle modals
   const openUserModal = (orgId = null) => {
     setSelectedOrgId(orgId);
     setShowUserModal(true);
+  };
+
+  const openDetailModal = (orgId = null) => {
+    setSelectedOrgId(orgId);
+    setShowDetailModal(true);
+  };
+
+  const handleModalSuccess = () => {
+    // Refresh the organizations list
+    fetchOrganizations();
   };
 
   const filteredOrganizations = organizations.filter(org => 
@@ -90,6 +103,14 @@ const OrganizationList = () => {
         organizationId={selectedOrgId}
       />
       
+      {/* Organization Detail Modal */}
+      <ModalOrganizationDetail 
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        organizationId={selectedOrgId || 'new'}
+        onSuccess={handleModalSuccess}
+      />
+      
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -100,7 +121,7 @@ const OrganizationList = () => {
           </div>
 
           <button
-            onClick={() => navigate('/organizations/new')}
+            onClick={() => openDetailModal('new')}
             className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black
                      rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
           >
@@ -142,7 +163,7 @@ const OrganizationList = () => {
                 : "You haven't created any organizations yet"}
             </p>
             <button
-              onClick={() => navigate('/organizations/new')}
+              onClick={() => openDetailModal('new')}
               className="mt-4 px-4 py-2 bg-black text-white dark:bg-white dark:text-black
                        rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
             >
@@ -179,7 +200,7 @@ const OrganizationList = () => {
                     </div>
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => navigate(`/organizations/${org.id}`)}
+                        onClick={() => openDetailModal(org.id)}
                         className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                       >
                         <Edit className="w-4 h-4" />
@@ -195,7 +216,7 @@ const OrganizationList = () => {
                 </div>
                 <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/30 flex justify-between">
                   <button
-                    onClick={() => navigate(`/organizations/${org.id}`)}
+                    onClick={() => openDetailModal(org.id)}
                     className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
                   >
                     View Details

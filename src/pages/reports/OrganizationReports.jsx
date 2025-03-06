@@ -100,6 +100,12 @@ const OrganizationReports = () => {
 
   const fetchRecentRequests = async () => {
     try {
+      // Only fetch if we have a specific organization (not 'all')
+      if (selectedOrganization === 'all' || !selectedOrganization) {
+        setRecentRequests([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('v4_requests')
         .select('id, reference_number, date_received, subject, status, completed_at')
@@ -111,6 +117,7 @@ const OrganizationReports = () => {
       setRecentRequests(data || []);
     } catch (err) {
       console.error('Error fetching recent requests:', err);
+      setRecentRequests([]);
     }
   };
 
@@ -134,6 +141,7 @@ const OrganizationReports = () => {
     
     fetchOrganizations();
   }, []);
+
   // Fetch report data
   useEffect(() => {
     const fetchReportData = async () => {
@@ -148,10 +156,12 @@ const OrganizationReports = () => {
           try {
             let query = supabase
               .from('v4_requests')
-              .select('sender, v4_organizations!v4_requests_sender_fkey(name), count(*)', { count: 'exact' })
+              .select(`
+                sender,
+                v4_organizations!v4_requests_sender_fkey(name)
+              `)
               .gte('date_received', dateRange.start)
-              .lte('date_received', dateRange.end)
-              .groupBy('sender, v4_organizations!v4_requests_sender_fkey(name)');
+              .lte('date_received', dateRange.end);
               
             if (selectedOrganization !== 'all') {
               query = query.eq('sender', selectedOrganization);
@@ -161,10 +171,23 @@ const OrganizationReports = () => {
             
             if (error) throw error;
             
-            // Process data for chart
-            const processedData = data.map((item, index) => ({
-              name: item.v4_organizations.name,
-              value: parseInt(item.count),
+            // Process data for chart - manual grouping since groupBy isn't working
+            const orgCounts = {};
+            data.forEach(item => {
+              const orgId = item.sender;
+              const orgName = item.v4_organizations?.name || 'Unknown';
+              
+              if (!orgCounts[orgId]) {
+                orgCounts[orgId] = { name: orgName, count: 0 };
+              }
+              
+              orgCounts[orgId].count += 1;
+            });
+            
+            // Convert to array for chart
+            const processedData = Object.values(orgCounts).map((org, index) => ({
+              name: org.name,
+              value: org.count,
               color: COLORS[index % COLORS.length]
             }));
             
@@ -195,7 +218,7 @@ const OrganizationReports = () => {
               console.log('RPC failed, using direct query instead');
               
               // Direct query as fallback
-              const { data: requestsData, error: requestsError } = await supabase
+              let fallbackQuery = supabase
                 .from('v4_requests')
                 .select(`
                   sender,
@@ -206,6 +229,12 @@ const OrganizationReports = () => {
                 .gte('date_received', dateRange.start)
                 .lte('date_received', dateRange.end)
                 .not('completed_at', 'is', null);
+                
+              if (selectedOrganization !== 'all') {
+                fallbackQuery = fallbackQuery.eq('sender', selectedOrganization);
+              }
+                
+              const { data: requestsData, error: requestsError } = await fallbackQuery;
                 
               if (requestsError) throw requestsError;
               
@@ -334,15 +363,15 @@ const OrganizationReports = () => {
             setOrgMonthlyActivity([]);
           }
         };
+
         // Fetch status distribution
         const fetchStatusDistribution = async () => {
           try {
             let query = supabase
               .from('v4_requests')
-              .select('status, count(*)', { count: 'exact' })
+              .select('status')
               .gte('date_received', dateRange.start)
-              .lte('date_received', dateRange.end)
-              .groupBy('status');
+              .lte('date_received', dateRange.end);
               
             if (selectedOrganization !== 'all') {
               query = query.eq('sender', selectedOrganization);
@@ -352,11 +381,23 @@ const OrganizationReports = () => {
             
             if (error) throw error;
             
-            // Process data for chart
-            const processedData = (data || []).map(item => ({
-              name: formatStatus(item.status),
-              value: parseInt(item.count),
-              color: STATUS_COLORS[item.status] || '#8884D8'
+            // Process data for chart - manual grouping
+            const statusCounts = {};
+            data.forEach(item => {
+              const status = item.status || 'pending';
+              
+              if (!statusCounts[status]) {
+                statusCounts[status] = 0;
+              }
+              
+              statusCounts[status] += 1;
+            });
+            
+            // Convert to array for chart
+            const processedData = Object.entries(statusCounts).map(([status, count]) => ({
+              name: formatStatus(status),
+              value: count,
+              color: STATUS_COLORS[status] || '#8884D8'
             }));
             
             setStatusDistribution(processedData);
@@ -446,9 +487,15 @@ const OrganizationReports = () => {
           fetchResponseTimes(),
           fetchMonthlyActivity(),
           fetchStatusDistribution(),
-          fetchAvgResponseTime(),
-          fetchRecentRequests()
+          fetchAvgResponseTime()
         ]);
+        
+        // Fetch recent requests separately since it depends on organization
+        if (selectedOrganization && selectedOrganization !== 'all') {
+          await fetchRecentRequests();
+        } else {
+          setRecentRequests([]);
+        }
         
       } catch (err) {
         console.error('Error fetching report data:', err);
@@ -460,12 +507,6 @@ const OrganizationReports = () => {
     
     fetchReportData();
   }, [organizations, selectedOrganization, dateRange]);
-
-  useEffect(() => {
-    if (selectedOrganization) {
-      fetchRecentRequests();
-    }
-  }, [selectedOrganization]);
 
   // Helper function to format status
   const formatStatus = (status) => {

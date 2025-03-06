@@ -37,6 +37,9 @@ import {
 import * as XLSX from 'xlsx';
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
 import ReportFilters from '../../components/reports/ReportFilters';
+import { Calendar as CalendarIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 
 // Chart colors - Enhanced color palette
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
@@ -62,6 +65,7 @@ const RequestReports = () => {
   const [completedRequests, setCompletedRequests] = useState(0);
   const [pendingRequests, setPendingRequests] = useState(0);
   const [inProgressRequests, setInProgressRequests] = useState(0);
+  const [showFilters, setShowFilters] = useState(true);
   
   // Filter state
   const [filters, setFilters] = useState({
@@ -475,302 +479,409 @@ const RequestReports = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-       {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Request Reports
-            </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Insights and statistics about document requests
-            </p>
-          </div>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Request Reports
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Insights and statistics about document requests
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={loading || refreshing}
+            className="flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 
+                     text-gray-700 dark:text-gray-300 rounded-lg
+                     hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
           
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={loading || refreshing}
-              className="flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 
-                       text-gray-700 dark:text-gray-300 rounded-lg
-                       hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-            
-            <button
-              onClick={handleExport}
-              disabled={loading || refreshing || totalRequests === 0}
-              className="flex items-center px-3 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                       hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export Report
-            </button>
-          </div>
+          <button
+            onClick={handleExport}
+            disabled={loading || refreshing || totalRequests === 0}
+            className="flex items-center px-3 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
+                     hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Report
+          </button>
+        </div>
+      </div>
+      
+      {/* Date range indicators */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Calendar className="w-5 h-5 text-gray-400" />
+          <span className="text-sm font-medium text-gray-900 dark:text-white">
+            {dateRangeText.start} to {dateRangeText.end}
+          </span>
+          {filters.organization !== 'all' && (
+            <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 rounded-full">
+              {organizations.find(org => org.id === filters.organization)?.name || 'Organization Filter Active'}
+            </span>
+          )}
+        </div>
+      </div>
+      
+      {/* Inline Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
+        <div className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="text-sm font-medium text-gray-900 dark:text-white">Report Filters</h2>
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className="text-blue-500 dark:text-blue-400 text-xs flex items-center"
+          >
+            {showFilters ? (
+              <>
+                Hide Filters <ChevronUp className="ml-1 w-3 h-3" />
+              </>
+            ) : (
+              <>
+                Show Filters <ChevronDown className="ml-1 w-3 h-3" />
+              </>
+            )}
+          </button>
         </div>
         
-        {/* Date range indicator and filters - IMPROVED */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
-            {/* ReportFilters Component - Make sure this component is styled properly */}
-            <ReportFilters 
-              filters={filters}
-              onFilterChange={handleFilterChange}
-              organizations={organizations}
-            />
-        </div>
-        
-        {/* Error message */}
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800 dark:text-red-300">Error</h3>
-              <p className="mt-1 text-sm text-red-700 dark:text-red-200">{error}</p>
-              <button
-                onClick={() => setError(null)}
-                className="mt-2 flex items-center text-sm text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-100"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
-        
-        {loading && !refreshing ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-12 w-12 animate-spin text-gray-400 mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">Loading report data...</p>
-          </div>
-        ) : totalRequests === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8 text-center">
-            <BarChartIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              No data available
-            </h2>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-              There are no requests matching your filter criteria. Try adjusting your filters or selecting a different date range.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Status distribution chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <PieChartIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Request Status Distribution
-                </h2>
-              </div>
-              
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={statusDistribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {statusDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Organization distribution chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <BarChartIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Requests by Organization
-                  </h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleSort('name')}
-                    className="text-xs flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  >
-                    Name
-                    {sortConfig.key === 'name' && (
-                      sortConfig.direction === 'asc' ? 
-                        <ArrowUp className="w-3 h-3 ml-1" /> : 
-                        <ArrowDown className="w-3 h-3 ml-1" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleSort('count')}
-                    className="text-xs flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  >
-                    Count
-                    {sortConfig.key === 'count' && (
-                      sortConfig.direction === 'asc' ? 
-                        <ArrowUp className="w-3 h-3 ml-1" /> : 
-                        <ArrowDown className="w-3 h-3 ml-1" />
-                    )}
-                  </button>
-                </div>
-              </div>
-              
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={organizationDistribution}
-                    layout="vertical"
-                    margin={{
-                      top: 5,
-                      right: 30,
-                      left: 100,
-                      bottom: 5,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" />
-                    <YAxis 
-                      type="category" 
-                      dataKey="name" 
-                      width={80}
-                      tick={{ fontSize: 12 }}
+        {showFilters && (
+          <div className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Date Range
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      Start Date
+                    </label>
+                    <DatePicker
+                      selected={parseISO(filters.dateRange.start)}
+                      onChange={(date) => {
+                        setFilters({
+                          ...filters,
+                          dateRange: {
+                            ...filters.dateRange,
+                            start: format(date, 'yyyy-MM-dd')
+                          }
+                        });
+                      }}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                     />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Requests">
-                      {organizationDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Monthly trends chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Monthly Request Trends
-                </h2>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      End Date
+                    </label>
+                    <DatePicker
+                      selected={parseISO(filters.dateRange.end)}
+                      onChange={(date) => {
+                        setFilters({
+                          ...filters,
+                          dateRange: {
+                            ...filters.dateRange,
+                            end: format(date, 'yyyy-MM-dd')
+                          }
+                        });
+                      }}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
+                  </div>
+                </div>
               </div>
               
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={monthlyTrends}
-                    margin={{
-                      top: 10,
-                      right: 30,
-                      left: 0,
-                      bottom: 0,
-                    }}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Organization
+                </label>
+                <select
+                  value={filters.organization}
+                  onChange={(e) => {
+                    setFilters({
+                      ...filters,
+                      organization: e.target.value
+                    });
+                  }}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                >
+                  <option value="all">All Organizations</option>
+                  {organizations.map(org => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                </select>
+                
+                {/* Add button to quickly apply filters */}
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={handleRefresh}
+                    className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors"
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Area type="monotone" dataKey="total" name="Total" fill="#8884d8" stroke="#8884d8" fillOpacity={0.2} />
-                    <Area type="monotone" dataKey="completed" name="Completed" fill={STATUS_COLORS.completed} stroke={STATUS_COLORS.completed} fillOpacity={0.6} />
-                    <Area type="monotone" dataKey="in_progress" name="In Progress" fill={STATUS_COLORS.in_progress} stroke={STATUS_COLORS.in_progress} fillOpacity={0.6} />
-                    <Area type="monotone" dataKey="pending" name="Pending" fill={STATUS_COLORS.pending} stroke={STATUS_COLORS.pending} fillOpacity={0.6} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Key metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Total Requests */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Total Requests
-                    </p>
-                    <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                      {formatNumber(totalRequests)}
-                    </h3>
-                  </div>
-                  <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <Filter className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Completion Rate */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Completion Rate
-                    </p>
-                    <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                      {completionRate}%
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {formatNumber(completedRequests)} completed
-                    </p>
-                  </div>
-                  <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <CheckSquare className="h-5 w-5 text-green-500 dark:text-green-400" />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Average Response Time */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Avg. Response Time
-                    </p>
-                    <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                      {avgResponseTime !== null ? `${avgResponseTime} days` : 'N/A'}
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      For completed requests
-                    </p>
-                  </div>
-                  <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                    <Clock className="h-5 w-5 text-purple-500 dark:text-purple-400" />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Pending Rate */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Pending Rate
-                    </p>
-                    <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                      {pendingRate}%
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {formatNumber(pendingRequests)} pending
-                    </p>
-                  </div>
-                  <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                    <AlertCircle className="h-5 w-5 text-amber-500 dark:text-amber-400" />
-                  </div>
+                    Apply Filters
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         )}
       </div>
+      
+      {/* Error message */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-300">Error</h3>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-200">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="mt-2 flex items-center text-sm text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-100"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {loading && !refreshing ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-12 w-12 animate-spin text-gray-400 mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">Loading report data...</p>
+        </div>
+      ) : totalRequests === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8 text-center">
+          <BarChartIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            No data available
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+            There are no requests matching your filter criteria. Try adjusting your filters or selecting a different date range.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Status distribution chart */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <PieChartIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Request Status Distribution
+              </h2>
+            </div>
+            
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {statusDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Organization distribution chart */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChartIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Requests by Organization
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleSort('name')}
+                  className="text-xs flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  Name
+                  {sortConfig.key === 'name' && (
+                    sortConfig.direction === 'asc' ? 
+                      <ArrowUp className="w-3 h-3 ml-1" /> : 
+                      <ArrowDown className="w-3 h-3 ml-1" />
+                  )}
+                </button>
+                <button
+                  onClick={() => handleSort('value')}
+                  className="text-xs flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  Count
+                  {sortConfig.key === 'value' && (
+                    sortConfig.direction === 'asc' ? 
+                      <ArrowUp className="w-3 h-3 ml-1" /> : 
+                      <ArrowDown className="w-3 h-3 ml-1" />
+                  )}
+                </button>
+              </div>
+            </div>
+            
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={organizationDistribution}
+                  layout="vertical"
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 100,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" />
+                  <YAxis 
+                    type="category" 
+                    dataKey="name" 
+                    width={80}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="value" name="Requests">
+                    {organizationDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Monthly trends chart */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Monthly Request Trends
+              </h2>
+            </div>
+            
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={monthlyTrends}
+                  margin={{
+                    top: 10,
+                    right: 30,
+                    left: 0,
+                    bottom: 0,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Area type="monotone" dataKey="total" name="Total" fill="#8884d8" stroke="#8884d8" fillOpacity={0.2} />
+                  <Area type="monotone" dataKey="completed" name="Completed" fill={STATUS_COLORS.completed} stroke={STATUS_COLORS.completed} fillOpacity={0.6} />
+                  <Area type="monotone" dataKey="in_progress" name="In Progress" fill={STATUS_COLORS.in_progress} stroke={STATUS_COLORS.in_progress} fillOpacity={0.6} />
+                  <Area type="monotone" dataKey="pending" name="Pending" fill={STATUS_COLORS.pending} stroke={STATUS_COLORS.pending} fillOpacity={0.6} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Key metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Requests */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Total Requests
+                  </p>
+                  <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                    {formatNumber(totalRequests)}
+                  </h3>
+                </div>
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <Filter className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                </div>
+              </div>
+            </div>
+            
+            {/* Completion Rate */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Completion Rate
+                  </p>
+                  <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                    {completionRate}%
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {formatNumber(completedRequests)} completed
+                  </p>
+                </div>
+                <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <CheckSquare className="h-5 w-5 text-green-500 dark:text-green-400" />
+                </div>
+              </div>
+            </div>
+            
+            {/* Average Response Time */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Avg. Response Time
+                  </p>
+                  <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                    {avgResponseTime !== null ? `${avgResponseTime} days` : 'N/A'}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    For completed requests
+                  </p>
+                </div>
+                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <Clock className="h-5 w-5 text-purple-500 dark:text-purple-400" />
+                </div>
+              </div>
+            </div>
+            
+            {/* Pending Rate */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Pending Rate
+                  </p>
+                  <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                    {pendingRate}%
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {formatNumber(pendingRequests)} pending
+                  </p>
+                </div>
+                <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  </div>
     );
 };
 export default RequestReports;

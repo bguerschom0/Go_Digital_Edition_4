@@ -97,11 +97,7 @@ const OrganizationReports = () => {
     }
   }, [selectedOrganization, organizations, statusDistribution, summaryMetrics]);
   
-  useEffect(() => {
-    if (selectedOrganization) {
-      fetchRecentRequests();
-    }
-  }, [selectedOrganization]);
+
   
 
   // Fetch organizations list
@@ -121,6 +117,12 @@ const OrganizationReports = () => {
     
     // Add to Promise.all array:
     fetchRecentRequests()
+
+    useEffect(() => {
+      if (selectedOrganization) {
+        fetchRecentRequests();
+      }
+    }, [selectedOrganization]);
     
 
     const fetchOrganizations = async () => {

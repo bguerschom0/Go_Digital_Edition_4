@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Moon, Sun, User, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Moon, Sun, User, Lock, AlertCircle, Loader2, ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../config/supabase';
@@ -159,6 +159,7 @@ const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [attemptsLeft, setAttemptsLeft] = useState(null);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [tempUser, setTempUser] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -176,6 +177,7 @@ const LoginPage = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setAttemptsLeft(null);
     setIsLoading(true);
 
     try {
@@ -183,18 +185,21 @@ const LoginPage = () => {
         error: loginError, 
         passwordChangeRequired, 
         user: loggedInUser,
-        accountInactive 
+        accountInactive,
+        accountLocked,
+        attemptsLeft: remainingAttempts
       } = await login(username, password);
       
       setIsLoading(false);
 
-      if (accountInactive) {
-        setError('Account is not active. Please contact the administrator.');
+      if (accountInactive || accountLocked) {
+        setError(loginError);
         return;
       }
       
       if (loginError) {
         setError(loginError);
+        setAttemptsLeft(remainingAttempts);
         return;
       }
 
@@ -231,8 +236,7 @@ const LoginPage = () => {
       
       if (error) {
         setError(error);
-
-      return;
+        return;
       }
 
       // Fetch updated user information
@@ -270,6 +274,19 @@ const LoginPage = () => {
     document.documentElement.classList.toggle('dark', newMode);
   };
 
+  // Determine error display type
+  const getErrorSeverity = () => {
+    if (error && error.includes('locked')) {
+      return 'high'; // Account locked
+    }
+    if (attemptsLeft !== null && attemptsLeft <= 2) {
+      return 'medium'; // Few attempts left
+    }
+    return 'normal'; // Standard error
+  };
+
+  const errorSeverity = getErrorSeverity();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
 
@@ -305,10 +322,19 @@ const LoginPage = () => {
         </h2>
         
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/30 border border-red-400 dark:border-red-800 
-                       text-red-700 dark:text-red-200 px-4 py-3 rounded-lg mb-6 flex items-start gap-2"
+          <div className={`mb-6 px-4 py-3 rounded-lg flex items-start gap-2
+            ${errorSeverity === 'high' 
+              ? 'bg-red-100 dark:bg-red-900/40 border border-red-500 dark:border-red-800 text-red-800 dark:text-red-200' 
+              : errorSeverity === 'medium'
+                ? 'bg-amber-100 dark:bg-amber-900/30 border border-amber-500 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+                : 'bg-red-50 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200'
+            }`}
           >
-            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            {errorSeverity === 'high' ? (
+              <ShieldAlert className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            )}
             <span>{error}</span>
           </div>
         )}
@@ -327,9 +353,7 @@ const LoginPage = () => {
               required
               disabled={isLoading}
             />
-            <span className="absolute inset-y-0 right-3 flex items-center">
-              <User className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-            </span>
+            <User className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
           </div>
           
           <div className="relative">
@@ -345,9 +369,7 @@ const LoginPage = () => {
               required
               disabled={isLoading}
             />
-            <span className="absolute inset-y-0 right-3 flex items-center">
-              <Lock className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-            </span>
+            <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
           </div>
 
           <button 

@@ -212,8 +212,8 @@ const LoginPage = () => {
         setUser(loggedInUser);
         localStorage.setItem('user', JSON.stringify(loggedInUser));
         
-        // Get role-specific dashboard path
-        const dashboardPath = getRoleBasedDashboard(loggedInUser.role);
+        // Get role-specific dashboard path - using only user_role_v4
+        const dashboardPath = getRoleBasedDashboard(loggedInUser.user_role_v4);
         navigate(dashboardPath);
       }
     } catch (err) {
@@ -252,15 +252,21 @@ const LoginPage = () => {
         return;
       }
 
-      // Update user state and storage
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      // Update user state and storage - using only user_role_v4
+      const userWithRole = {
+        ...updatedUser,
+        role: updatedUser.user_role_v4
+      };
+      
+      setUser(userWithRole);
+      localStorage.setItem('user', JSON.stringify(userWithRole));
       
       // Reset temporary user and close modal
       setTempUser(null);
       setShowPasswordChange(false);
       
-      const dashboardPath = getRoleBasedDashboard(updatedUser.role);
+      // Navigate based on user_role_v4
+      const dashboardPath = getRoleBasedDashboard(updatedUser.user_role_v4);
       navigate(dashboardPath);
     } catch (error) {
       console.error('Password change error:', error);

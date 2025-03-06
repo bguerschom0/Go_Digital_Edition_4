@@ -77,11 +77,11 @@ const AdminDashboard = () => {
       // Fetch user role distribution
       const { data: roleData } = await supabase
         .from('users')
-        .select('User_Role_V4');
+        .select('user_role_v4');
 
       // Process role distribution data
       const roleCounts = roleData.reduce((acc, user) => {
-        const role = user.User_Role_V4 || 'user'; // Default to user if not set
+        const role = user.user_role_v4 || 'user'; // Default to user if not set
         acc[role] = (acc[role] || 0) + 1;
         return acc;
       }, {});

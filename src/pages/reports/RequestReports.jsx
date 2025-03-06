@@ -319,135 +319,139 @@ const RequestReports = () => {
   }, [inProgressRequests, totalRequests]);
 
   // Export to Excel
-  const handleExport = () => {
-    try {
-      // Create workbook
-      const wb = XLSX.utils.book_new();
+const handleExport = async () => {
+  try {
+    // Show loading state
+    setRefreshing(true);
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    
+    // 1. Fetch all request data for export
+    let allRequestsQuery = supabase
+      .from('v4_requests')
+      .select('*')
+      .gte('date_received', filters.dateRange.start)
+      .lte('date_received', filters.dateRange.end);
       
-      // 1. All Request Data Sheet (NEW)
-      const allDataHeaders = [
-        'Request ID', 
-        'Status', 
-        'Organization', 
-        'Date Received', 
-        'Completed Date', 
-        'Days to Complete'
-      ];
-      
-      // Fetch organization data for mapping
-      const orgNames = {};
-      organizations.forEach(org => {
-        orgNames[org.id] = org.name;
-      });
-      
-      // Format all request data for export
-      const allRequestData = [];
-      
-      // Add headers row
-      allRequestData.push(allDataHeaders);
-      
-      // Get all filtered requests
-      let requestsToExport = [];
-      
-      // We need to fetch the data with organization names
-      const fetchAllRequestData = async () => {
-        let baseQuery = supabase
-          .from('v4_requests')
-          .select('*')
-          .gte('date_received', filters.dateRange.start)
-          .lte('date_received', filters.dateRange.end);
-          
-        if (filters.organization !== 'all') {
-          baseQuery = baseQuery.eq('sender', filters.organization);
-        }
-        
-        const { data, error } = await baseQuery;
-        
-        if (error) throw error;
-        
-        // Process and add data rows
-        data.forEach(request => {
-          const receivedDate = request.date_received ? parseISO(request.date_received) : null;
-          const completedDate = request.completed_at ? parseISO(request.completed_at) : null;
-          
-          let daysToComplete = '';
-          if (receivedDate && completedDate) {
-            daysToComplete = Math.round((completedDate - receivedDate) / (1000 * 60 * 60 * 24));
-          }
-          
-          allRequestData.push([
-            request.id || '',
-            formatStatus(request.status || ''),
-            orgNames[request.sender] || 'Unknown',
-            request.date_received ? format(receivedDate, 'MMM d, yyyy') : '',
-            request.completed_at ? format(completedDate, 'MMM d, yyyy') : '',
-            daysToComplete
-          ]);
-        });
-        
-        // Create and add All Data Sheet
-        const allDataSheet = XLSX.utils.aoa_to_sheet(allRequestData);
-        XLSX.utils.book_append_sheet(wb, allDataSheet, 'All Requests');
-      
-        // 2. Status distribution sheet
-        const statusSheet = XLSX.utils.json_to_sheet(statusDistribution.map(item => ({
-          Status: item.name,
-          Count: item.value,
-          Percentage: `${((item.value / totalRequests) * 100).toFixed(1)}%`
-        })));
-        XLSX.utils.book_append_sheet(wb, statusSheet, 'Status Distribution');
-        
-        // 3. Organization distribution sheet
-        const orgSheet = XLSX.utils.json_to_sheet(organizationDistribution.map(item => ({
-          Organization: item.name,
-          Count: item.value,
-          Percentage: `${((item.value / totalRequests) * 100).toFixed(1)}%`
-        })));
-        XLSX.utils.book_append_sheet(wb, orgSheet, 'Organization Distribution');
-        
-        // 4. Monthly trends sheet
-        const trendsSheet = XLSX.utils.json_to_sheet(monthlyTrends.map(item => ({
-          Month: item.month,
-          'Total Requests': item.total,
-          Pending: item.pending,
-          'In Progress': item.in_progress,
-          Completed: item.completed
-        })));
-        XLSX.utils.book_append_sheet(wb, trendsSheet, 'Monthly Trends');
-        
-        // 5. Summary sheet
-        const summaryData = [
-          { Metric: 'Total Requests', Value: totalRequests },
-          { Metric: 'Completed Requests', Value: completedRequests },
-          { Metric: 'Completion Rate', Value: `${completionRate}%` },
-          { Metric: 'Pending Requests', Value: pendingRequests },
-          { Metric: 'In Progress Requests', Value: inProgressRequests },
-          { Metric: 'Average Response Time (Days)', Value: avgResponseTime || 'N/A' },
-          { Metric: 'Date Range', Value: `${dateRangeText.start} to ${dateRangeText.end}` },
-          { Metric: 'Organization Filter', Value: filters.organization === 'all' ? 'All Organizations' : 
-            organizations.find(org => org.id === filters.organization)?.name || filters.organization },
-          { Metric: 'Report Generated On', Value: format(new Date(), 'PPP') },
-          { Metric: 'Generated By', Value: user?.full_name || user?.email || 'Unknown' }
-        ];
-        
-        const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
-        
-        // Write file and download
-        XLSX.writeFile(wb, `request_report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-      };
-      
-      // Execute the async function
-      fetchAllRequestData().catch(error => {
-        console.error('Error exporting to Excel:', error);
-        alert('Failed to export data. Please try again.');
-      });
-      
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('Failed to export data. Please try again.');
+    if (filters.organization !== 'all') {
+      allRequestsQuery = allRequestsQuery.eq('sender', filters.organization);
     }
-  };
+    
+    const { data: requestsData, error: requestsError } = await allRequestsQuery;
+    
+    if (requestsError) throw requestsError;
+    
+    // Create a map of organization IDs to names
+    const orgMap = {};
+    organizations.forEach(org => {
+      orgMap[org.id] = org.name;
+    });
+    
+    // Prepare the All Requests sheet
+    const allRequestsHeaders = [
+      'Request ID', 
+      'Status', 
+      'Organization', 
+      'Date Received', 
+      'Completed Date', 
+      'Days to Complete'
+    ];
+    
+    const allRequestsRows = requestsData.map(request => {
+      const receivedDate = request.date_received ? parseISO(request.date_received) : null;
+      const completedDate = request.completed_at ? parseISO(request.completed_at) : null;
+      
+      let daysToComplete = '';
+      if (receivedDate && completedDate) {
+        daysToComplete = Math.round((completedDate - receivedDate) / (1000 * 60 * 60 * 24));
+      }
+      
+      return [
+        request.id || '',
+        formatStatus(request.status || ''),
+        orgMap[request.sender] || 'Unknown',
+        request.date_received ? format(receivedDate, 'PPP') : '',
+        request.completed_at ? format(completedDate, 'PPP') : '',
+        daysToComplete
+      ];
+    });
+    
+    // Add headers to the rows
+    const allRequestsSheetData = [allRequestsHeaders, ...allRequestsRows];
+    
+    // Create the sheet
+    const allRequestsSheet = XLSX.utils.aoa_to_sheet(allRequestsSheetData);
+    
+    // Set column widths for better readability
+    const colWidths = [
+      { wch: 10 }, // Request ID
+      { wch: 15 }, // Status
+      { wch: 30 }, // Organization
+      { wch: 15 }, // Date Received
+      { wch: 15 }, // Completed Date
+      { wch: 15 }  // Days to Complete
+    ];
+    
+    // Apply column widths
+    allRequestsSheet['!cols'] = colWidths;
+    
+    // Add the sheet to workbook
+    XLSX.utils.book_append_sheet(wb, allRequestsSheet, 'All Requests');
+    
+    // 2. Status distribution sheet
+    const statusSheet = XLSX.utils.json_to_sheet(statusDistribution.map(item => ({
+      Status: item.name,
+      Count: item.value,
+      Percentage: `${((item.value / totalRequests) * 100).toFixed(1)}%`
+    })));
+    XLSX.utils.book_append_sheet(wb, statusSheet, 'Status Distribution');
+    
+    // 3. Organization distribution sheet
+    const orgSheet = XLSX.utils.json_to_sheet(organizationDistribution.map(item => ({
+      Organization: item.name,
+      Count: item.value,
+      Percentage: `${((item.value / totalRequests) * 100).toFixed(1)}%`
+    })));
+    XLSX.utils.book_append_sheet(wb, orgSheet, 'Organization Distribution');
+    
+    // 4. Monthly trends sheet
+    const trendsSheet = XLSX.utils.json_to_sheet(monthlyTrends.map(item => ({
+      Month: item.month,
+      'Total Requests': item.total,
+      Pending: item.pending,
+      'In Progress': item.in_progress,
+      Completed: item.completed
+    })));
+    XLSX.utils.book_append_sheet(wb, trendsSheet, 'Monthly Trends');
+    
+    // 5. Summary sheet
+    const summaryData = [
+      { Metric: 'Total Requests', Value: totalRequests },
+      { Metric: 'Completed Requests', Value: completedRequests },
+      { Metric: 'Completion Rate', Value: `${completionRate}%` },
+      { Metric: 'Pending Requests', Value: pendingRequests },
+      { Metric: 'In Progress Requests', Value: inProgressRequests },
+      { Metric: 'Average Response Time (Days)', Value: avgResponseTime || 'N/A' },
+      { Metric: 'Date Range', Value: `${dateRangeText.start} to ${dateRangeText.end}` },
+      { Metric: 'Organization Filter', Value: filters.organization === 'all' ? 'All Organizations' : 
+        organizations.find(org => org.id === filters.organization)?.name || filters.organization },
+      { Metric: 'Report Generated On', Value: format(new Date(), 'PPP') },
+      { Metric: 'Generated By', Value: user?.full_name || user?.email || 'Unknown' }
+    ];
+    
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+    
+    // Write file and download
+    XLSX.writeFile(wb, `request_report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  } catch (error) {
+    console.error('Error exporting to Excel:', error);
+    alert('Failed to export data. Please try again.');
+  } finally {
+    setRefreshing(false);
+  }
+};
 
   // Manual refresh
   const handleRefresh = () => {
@@ -479,7 +483,7 @@ const RequestReports = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* Header */}
+     {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -529,90 +533,87 @@ const RequestReports = () => {
         </div>
       </div>
       
-{/* Inline Filters - Improved */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
-        <div className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-sm font-medium text-gray-900 dark:text-white">Report Filters</h2>
-          <button 
-            onClick={() => setShowFilters(!showFilters)}
-            className="text-gray-500 dark:text-gray-400 text-xs flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-          >
-            {showFilters ? (
-              <>
-                Hide Filters <ChevronUp className="ml-1 w-3 h-3" />
-              </>
-            ) : (
-              <>
-                Show Filters <ChevronDown className="ml-1 w-3 h-3" />
-              </>
-            )}
-          </button>
+      {/* Report Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Report Filters
+          </h2>
         </div>
         
-        {showFilters && (
-          <div className="p-4">
-            <div className="flex flex-col md:flex-row items-start md:items-end gap-4">
-              <div className="w-full md:w-1/3">
-                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  Start Date
-                </label>
-                <DatePicker
-                  selected={parseISO(filters.dateRange.start)}
-                  onChange={(date) => {
-                    setFilters({
-                      ...filters,
-                      dateRange: {
-                        ...filters.dateRange,
-                        start: format(date, 'yyyy-MM-dd')
-                      }
-                    });
-                  }}
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                />
-              </div>
-              
-              <div className="w-full md:w-1/3">
-                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  End Date
-                </label>
-                <DatePicker
-                  selected={parseISO(filters.dateRange.end)}
-                  onChange={(date) => {
-                    setFilters({
-                      ...filters,
-                      dateRange: {
-                        ...filters.dateRange,
-                        end: format(date, 'yyyy-MM-dd')
-                      }
-                    });
-                  }}
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                />
-              </div>
-              
-              <div className="w-full md:w-1/3">
-                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  Organization
-                </label>
-                <select
-                  value={filters.organization}
-                  onChange={(e) => {
-                    setFilters({
-                      ...filters,
-                      organization: e.target.value
-                    });
-                  }}
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                >
-                  <option value="all">All Organizations</option>
-                  {organizations.map(org => (
-                    <option key={org.id} value={org.id}>{org.name}</option>
-                  ))}
-                </select>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Organization select */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Organization
+            </label>
+            <select
+              value={filters.organization}
+              onChange={(e) => setFilters({...filters, organization: e.target.value})}
+              className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                       bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+            >
+              <option value="all">All Organizations</option>
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          {/* Date Range Start */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Date Range (Start)
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <DatePicker
+                selected={parseISO(filters.dateRange.start)}
+                onChange={(date) => {
+                  setFilters({
+                    ...filters,
+                    dateRange: {
+                      ...filters.dateRange,
+                      start: format(date, 'yyyy-MM-dd')
+                    }
+                  });
+                }}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+              />
             </div>
           </div>
-        )}
+          
+          {/* Date Range End */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Date Range (End)
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <DatePicker
+                selected={parseISO(filters.dateRange.end)}
+                onChange={(date) => {
+                  setFilters({
+                    ...filters,
+                    dateRange: {
+                      ...filters.dateRange,
+                      end: format(date, 'yyyy-MM-dd')
+                    }
+                  });
+                }}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
+                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+              />
+            </div>
+          </div>
+        </div>
       </div>
       
       {/* Error message */}

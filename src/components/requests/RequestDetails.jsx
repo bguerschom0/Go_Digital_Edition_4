@@ -10,7 +10,8 @@ import {
   Edit2,
   X,
   Check,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -24,13 +25,29 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
   const [requestFiles, setRequestFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [organizations, setOrganizations] = useState([]);
   const [editing, setEditing] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [editData, setEditData] = useState({});
   const [newStatus, setNewStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [organizations, setOrganizations] = useState([]);
+  
+  // Create notifications
+  const createNotification = async (userId, title, message, relatedRequestId = requestId) => {
+    try {
+      await supabase
+        .from('v4_notifications')
+        .insert([{
+          user_id: userId,
+          title,
+          message,
+          related_request_id: relatedRequestId
+        }]);
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
+  };
   
   // Fetch request data
   useEffect(() => {
@@ -135,26 +152,27 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
       supabase.removeChannel(requestSubscription);
     };
   }, [requestId]);
-
-  useEffect(() => {
-  const fetchOrganizations = async () => {
-    if (!editing) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('v4_organizations')
-        .select('id, name')
-        .order('name');
-        
-      if (error) throw error;
-      setOrganizations(data || []);
-    } catch (error) {
-      console.error('Error fetching organizations:', error);
-    }
-  };
   
-  fetchOrganizations();
-}, [editing]);
+  // Fetch organizations when editing starts
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      if (!editing) return; // Only fetch when editing is active
+      
+      try {
+        const { data, error } = await supabase
+          .from('v4_organizations')
+          .select('id, name')
+          .order('name');
+          
+        if (error) throw error;
+        setOrganizations(data || []);
+      } catch (error) {
+        console.error('Error fetching organizations:', error);
+      }
+    };
+    
+    fetchOrganizations();
+  }, [editing]); // Only re-fetch when editing state changes
 
   // Download a file
   const downloadFile = async (filePath, fileName) => {
@@ -185,6 +203,36 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
     try {
       setSaving(true);
       
+      // Create notification about the request update
+      if (request.created_by !== user.id) {
+        await createNotification(
+          request.created_by,
+          'Request Updated',
+          `Request ${request.reference_number} has been updated by ${user.full_name || 'a user'}.`
+        );
+      }
+      
+      // Notify organization users
+      const { data: orgUsers } = await supabase
+        .from('v4_user_organizations')
+        .select('user_id')
+        .eq('organization_id', request.sender);
+        
+      if (orgUsers && orgUsers.length > 0) {
+        const notificationPromises = orgUsers
+          .filter(orgUser => orgUser.user_id !== user.id)
+          .map(orgUser => 
+            createNotification(
+              orgUser.user_id,
+              'Request Updated',
+              `Request ${request.reference_number} details have been updated.`
+            )
+          );
+        
+        await Promise.all(notificationPromises);
+      }
+      
+      // Update the request
       const { error } = await supabase
         .from('v4_requests')
         .update({
@@ -219,6 +267,67 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
     try {
       setSavingStatus(true);
       
+      // Only create notifications if status actually changed
+      if (newStatus !== request.status) {
+        // Notify the request creator
+        if (request.created_by !== user.id) {
+          await createNotification(
+            request.created_by,
+            'Request Status Updated',
+            `Request ${request.reference_number} status has been changed to ${formatStatus(newStatus)} by ${user.full_name || 'a user'}.`
+          );
+        }
+        
+        // Notify organization users
+        const { data: orgUsers } = await supabase
+          .from('v4_user_organizations')
+          .select('user_id')
+          .eq('organization_id', request.sender);
+          
+        if (orgUsers && orgUsers.length > 0) {
+          // Create notifications for each organization user
+          const notificationPromises = orgUsers
+            .filter(orgUser => orgUser.user_id !== user.id) // Don't notify the current user
+            .map(orgUser => 
+              createNotification(
+                orgUser.user_id,
+                'Request Status Updated',
+                `Request ${request.reference_number} status has been changed to ${formatStatus(newStatus)}.`
+              )
+            );
+          
+          await Promise.all(notificationPromises);
+        }
+        
+        // Special notifications for completed status
+        if (newStatus === 'completed') {
+          // Notify request creator of completion
+          if (request.created_by !== user.id) {
+            await createNotification(
+              request.created_by,
+              'Request Completed',
+              `Request ${request.reference_number} has been marked as completed by ${user.full_name || 'a user'}.`
+            );
+          }
+          
+          // Notify organization users of completion
+          if (orgUsers && orgUsers.length > 0) {
+            const completionPromises = orgUsers
+              .filter(orgUser => orgUser.user_id !== user.id)
+              .map(orgUser => 
+                createNotification(
+                  orgUser.user_id,
+                  'Request Completed',
+                  `Request ${request.reference_number} has been marked as completed.`
+                )
+              );
+            
+            await Promise.all(completionPromises);
+          }
+        }
+      }
+      
+      // Update the request status
       const { error } = await supabase
         .from('v4_requests')
         .update({
@@ -249,6 +358,108 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
     const { name, value } = e.target;
     setEditData(prev => ({ ...prev, [name]: value }));
   };
+  
+  // Handle file upload completion and notifications
+  const handleFileUploadComplete = async (count) => {
+    if (count <= 0) return;
+    
+    // Create notification about file upload
+    if (request.created_by !== user.id) {
+      await createNotification(
+        request.created_by,
+        'New Files Uploaded',
+        `${count} new file${count > 1 ? 's were' : ' was'} uploaded to request ${request.reference_number} by ${user.full_name || 'a user'}.`
+      );
+    }
+    
+    // Notify organization users
+    const { data: orgUsers } = await supabase
+      .from('v4_user_organizations')
+      .select('user_id')
+      .eq('organization_id', request.sender);
+      
+    if (orgUsers && orgUsers.length > 0) {
+      const notificationPromises = orgUsers
+        .filter(orgUser => orgUser.user_id !== user.id)
+        .map(orgUser => 
+          createNotification(
+            orgUser.user_id,
+            'New Files Uploaded',
+            `${count} new file${count > 1 ? 's were' : ' was'} uploaded to request ${request.reference_number}.`
+          )
+        );
+      
+      await Promise.all(notificationPromises);
+    }
+  };
+  
+  // Handle request deletion
+  const handleDeleteRequest = async () => {
+    if (!window.confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      // First create a notification about the deletion
+      await supabase
+        .from('v4_notifications')
+        .insert([{
+          user_id: request.created_by, // Notify the creator
+          title: 'Request Deleted',
+          message: `Request ${request.reference_number} has been deleted by ${user.full_name || 'a user'}.`,
+          related_request_id: null // Since the request will be deleted
+        }]);
+        
+      // Also notify organization users if applicable
+      const { data: orgUsers } = await supabase
+        .from('v4_user_organizations')
+        .select('user_id')
+        .eq('organization_id', request.sender);
+        
+      if (orgUsers && orgUsers.length > 0) {
+        const notificationPromises = orgUsers.map(orgUser => 
+          supabase
+            .from('v4_notifications')
+            .insert([{
+              user_id: orgUser.user_id,
+              title: 'Request Deleted',
+              message: `Request ${request.reference_number} has been deleted by ${user.full_name || 'a user'}.`,
+              related_request_id: null
+            }])
+        );
+        
+        await Promise.all(notificationPromises);
+      }
+      
+      // Delete request files from storage
+      const { data: files } = await supabase
+        .from('v4_request_files')
+        .select('file_path')
+        .eq('request_id', requestId);
+        
+      if (files && files.length > 0) {
+        await supabase.storage
+          .from('request-files')
+          .remove(files.map(file => file.file_path));
+      }
+      
+      // Delete the request (this will cascade delete files and comments due to DB constraints)
+      const { error } = await supabase
+        .from('v4_requests')
+        .delete()
+        .eq('id', requestId);
+        
+      if (error) throw error;
+      
+      // Close the modal and refresh the list
+      if (onClose) onClose();
+      if (onUpdate) onUpdate();
+      
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      alert('Failed to delete request. Please try again.');
+    }
+  };
 
   // Check if current user can edit this request
   const canEditRequest = () => {
@@ -261,6 +472,20 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
     if (user.role === 'user' && request.created_by === user.id) return true;
     
     // Organization users cannot edit requests
+    return false;
+  };
+  
+  // Check if current user can delete this request
+  const canDeleteRequest = () => {
+    if (!user || !request) return false;
+    
+    // Administrators can delete any request
+    if (user.role === 'administrator') return true;
+    
+    // Regular users can only delete requests they created
+    if (user.role === 'user' && request.created_by === user.id) return true;
+    
+    // Organization users cannot delete requests
     return false;
   };
 
@@ -413,164 +638,178 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
                 className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 
                          dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700
                          transition-colors"
+                title="Edit Request"
               >
                 <Edit2 className="h-4 w-4" />
+              </button>
+            )}
+            
+            {/* Delete button (only if canDeleteRequest is true) */}
+            {canDeleteRequest() && (
+              <button
+                onClick={handleDeleteRequest}
+                className="p-1 text-red-500 dark:text-red-400 hover:text-red-700 
+                         dark:hover:text-red-300 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20
+                         transition-colors"
+                title="Delete Request"
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             )}
           </div>
         </div>
         
-{/* Editing form */}
-{editing && (
-  <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-    <form className="space-y-4">
-      {/* Row 1: Ref Number, Date, Organization */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Reference Number */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Reference Number*
-          </label>
-          <input
-            type="text"
-            name="reference_number"
-            value={request.reference_number}
-            disabled={true}
-            className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                     bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white
-                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white cursor-not-allowed"
-          />
-        </div>
-        
-        {/* Date Received */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Date Received*
-          </label>
-          <div className="relative">
-            <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="date"
-              name="date_received"
-              value={editData.date_received}
-              onChange={handleInputChange}
-              className="w-full h-9 pl-8 pr-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                       bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-            />
+        {/* Editing form */}
+        {editing && (
+          <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <form className="space-y-4">
+              {/* Row 1: Ref Number, Date, Organization */}
+              <div className="grid grid-cols-3 gap-4">
+                {/* Reference Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Reference Number*
+                  </label>
+                  <input
+                    type="text"
+                    name="reference_number"
+                    value={request.reference_number}
+                    disabled={true}
+                    className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                             bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white
+                             focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white cursor-not-allowed"
+                  />
+                </div>
+                
+                {/* Date Received */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date Received*
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="date"
+                      name="date_received"
+                      value={editData.date_received}
+                      onChange={handleInputChange}
+                      className="w-full h-9 pl-8 pr-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                               focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                    />
+                  </div>
+                </div>
+                
+                {/* Sender Organization */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Sender Organization*
+                  </label>
+                  <select
+                    name="sender"
+                    value={editData.sender}
+                    onChange={handleInputChange}
+                    className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                             focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                  >
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {/* Row 2: Subject and Priority */}
+              <div className="grid grid-cols-4 gap-4">
+                {/* Subject */}
+                <div className="col-span-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Subject / Request Type*
+                  </label>
+                  <input
+                    type="text"
+                    name="subject"
+                    value={editData.subject}
+                    onChange={handleInputChange}
+                    className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                             focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                  />
+                </div>
+                
+                {/* Priority */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    name="priority"
+                    value={editData.priority}
+                    onChange={handleInputChange}
+                    className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                             bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                             focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                  >
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+              
+              {/* Row 3: Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Description <span className="text-gray-500 dark:text-gray-400 font-normal">(Optional)</span>
+                </label>
+                <textarea
+                  name="description"
+                  value={editData.description || ''}
+                  onChange={handleInputChange}
+                  rows="3"
+                  className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                />
+              </div>
+              
+              {/* Buttons - placed after description */}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  disabled={saving}
+                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 
+                           dark:hover:text-white transition-colors disabled:opacity-50 border border-gray-200 
+                           dark:border-gray-700 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveChanges}
+                  disabled={saving}
+                  className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
+                           hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
+                           flex items-center gap-1 disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-        </div>
-        
-        {/* Sender Organization */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Sender Organization*
-          </label>
-          <select
-            name="sender"
-            value={editData.sender}
-            onChange={handleInputChange}
-            className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-          >
-            {organizations.map((org) => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      
-      {/* Row 2: Subject and Priority */}
-      <div className="grid grid-cols-4 gap-4">
-        {/* Subject */}
-        <div className="col-span-3">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Subject / Request Type*
-          </label>
-          <input
-            type="text"
-            name="subject"
-            value={editData.subject}
-            onChange={handleInputChange}
-            className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-          />
-        </div>
-        
-        {/* Priority */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Priority
-          </label>
-          <select
-            name="priority"
-            value={editData.priority}
-            onChange={handleInputChange}
-            className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-          >
-            <option value="low">Low</option>
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-      </div>
-      
-      {/* Row 3: Description */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Description <span className="text-gray-500 dark:text-gray-400 font-normal">(Optional)</span>
-        </label>
-        <textarea
-          name="description"
-          value={editData.description || ''}
-          onChange={handleInputChange}
-          rows="3"
-          className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                   bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                   focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-        />
-      </div>
-      
-      {/* Buttons - placed after description */}
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          disabled={saving}
-          className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 
-                   dark:hover:text-white transition-colors disabled:opacity-50 border border-gray-200 
-                   dark:border-gray-700 rounded"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSaveChanges}
-          disabled={saving}
-          className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
-                   hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
-                   flex items-center gap-1 disabled:opacity-50"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save Changes'
-          )}
-        </button>
-      </div>
-    </form>
-  </div>
-)}
+        )}
       </div>
       
       {/* Files Section */}
@@ -682,7 +921,7 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
             </h4>
             <FileUploader 
               requestId={request.id} 
-              onUploadComplete={() => {}} 
+              onUploadComplete={handleFileUploadComplete} 
               isResponseUpload={true}
             />
           </div>
@@ -696,7 +935,39 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
           Discussion
         </h3>
         
-        <CommentSection requestId={request.id} />
+        <CommentSection 
+          requestId={request.id} 
+          onCommentAdded={async (comment) => {
+            // Create notification about new comment
+            if (request.created_by !== user.id) {
+              await createNotification(
+                request.created_by,
+                'New Comment',
+                `A new comment was added to request ${request.reference_number} by ${user.full_name || 'a user'}.`
+              );
+            }
+            
+            // Notify organization users
+            const { data: orgUsers } = await supabase
+              .from('v4_user_organizations')
+              .select('user_id')
+              .eq('organization_id', request.sender);
+              
+            if (orgUsers && orgUsers.length > 0) {
+              const notificationPromises = orgUsers
+                .filter(orgUser => orgUser.user_id !== user.id && orgUser.user_id !== comment.user_id)
+                .map(orgUser => 
+                  createNotification(
+                    orgUser.user_id,
+                    'New Comment',
+                    `A new comment was added to request ${request.reference_number}.`
+                  )
+                );
+              
+              await Promise.all(notificationPromises);
+            }
+          }}
+        />
       </div>
     </div>
   );

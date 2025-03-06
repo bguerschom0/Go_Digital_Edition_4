@@ -133,12 +133,23 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
               fileToUpload = securedFile;
               isSecured = true;
             }
-            
+
+          
             // Update progress after processing
             setUploadProgress(prev => ({
               ...prev,
               [id]: { progress: 10, status: 'uploading' }
             }));
+
+          uploadedCount++;
+      
+      // Update file status in state
+      filesCopy[i] = {
+        ...filesCopy[i],
+        uploaded: true,
+        error: null
+      };
+            
           } catch (pdfError) {
             console.error('Error securing PDF:', pdfError);
             // Continue with original file if security application fails
@@ -248,21 +259,21 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
     }
     
     // Update request status if this is a response upload and all files were uploaded successfully
-    if (isResponseUpload && uploadedCount > 0 && uploadedCount === files.length) {
-      try {
-        await supabase
-          .from('v4_requests')
-          .update({ 
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            updated_by: user.id,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', requestId);
-      } catch (statusError) {
-        console.error('Error updating request status:', statusError);
-      }
+  if (isResponseUpload && uploadedCount > 0 && uploadedCount === files.length) {
+    try {
+      await supabase
+        .from('v4_requests')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          updated_by: user.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestId);
+    } catch (statusError) {
+      console.error('Error updating request status:', statusError);
     }
+  }
     
     setUploading(false);
     
@@ -272,16 +283,17 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
       setTimeout(() => setError(null), 5000);
     }
     
-    // Call the callback if all files were uploaded successfully
-    if (uploadedCount === files.length) {
-      if (onUploadComplete) onUploadComplete(uploadedCount);
-      // Clear the files list after successful upload
-      setTimeout(() => {
-        setFiles([]);
-        setUploadProgress({});
-      }, 2000);
-    }
-  };
+  // Call the callback with the count if all files were uploaded successfully
+  if (uploadedCount === files.length && uploadedCount > 0) {
+    if (onUploadComplete) onUploadComplete(uploadedCount);
+    
+    // Clear the files list after successful upload
+    setTimeout(() => {
+      setFiles([]);
+      setUploadProgress({});
+    }, 2000);
+  }
+};
 
   // Get file icon based on mime type
   const getFileIcon = (fileType) => {

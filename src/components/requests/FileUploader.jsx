@@ -107,32 +107,9 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
     // Create a copy of files to track progress
     const filesCopy = [...files];
     
-    // Check if bucket exists before attempting uploads
-    try {
-      // Verify the bucket exists
-      const { error: bucketError } = await supabase.storage.getBucket('request-files');
-      
-      if (bucketError && bucketError.message.includes("Bucket not found")) {
-        // Create the bucket if it doesn't exist
-        console.log("Bucket 'request-files' not found, creating it now...");
-        
-        const { error: createBucketError } = await supabase.storage.createBucket('request-files', {
-          public: false,
-          fileSizeLimit: 50 * 1024 * 1024 // 50MB
-        });
-        
-        if (createBucketError) {
-          throw new Error(`Error creating bucket: ${createBucketError.message}`);
-        }
-      } else if (bucketError) {
-        throw bucketError;
-      }
-    } catch (bucketError) {
-      console.error('Error with storage bucket:', bucketError);
-      setError(`Storage configuration error: ${bucketError.message}. Please contact support.`);
-      setUploading(false);
-      return;
-    }
+    // Skip bucket creation - assume it exists or was created by admin
+    // If you're getting RLS errors on bucket creation, your admin needs to
+    // create the bucket first in the Supabase dashboard
 
     for (let i = 0; i < filesCopy.length; i++) {
       const { file, id } = filesCopy[i];
@@ -182,11 +159,11 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
         const timestamp = Date.now();
         const fileExt = file.name.split('.').pop();
         const fileName = `${file.name.split('.')[0]}-${timestamp}.${fileExt}`;
-        const filePath = `requests/${requestId}/${fileName}`;
+        const filePath = `${requestId}/${fileName}`;  // Changed to a simpler path structure
         
         // Upload file to Supabase storage
         const { error: uploadError, data } = await supabase.storage
-          .from('request-files')
+          .from('request-files')  // This bucket should be pre-created by admin
           .upload(filePath, fileToUpload, {
             cacheControl: '3600',
             upsert: false,
@@ -204,7 +181,12 @@ const FileUploader = ({ requestId, onUploadComplete, isResponseUpload = false })
             },
           });
           
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          if (uploadError.message && uploadError.message.includes("Bucket not found")) {
+            throw new Error("Storage bucket 'request-files' doesn't exist. Please contact your system administrator.");
+          }
+          throw uploadError;
+        }
         
         // Update progress to show processing metadata
         setUploadProgress(prev => ({

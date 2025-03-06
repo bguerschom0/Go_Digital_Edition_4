@@ -330,7 +330,7 @@ return (
         </div>
         
         <button
-          onClick={handleExportExcel}
+          onClick={exportToExcel}
           disabled={loading || !selectedOrganization}
           className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
                    hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50"

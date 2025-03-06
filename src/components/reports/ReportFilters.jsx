@@ -2,48 +2,64 @@ import { useState } from 'react';
 import DateRangePicker from './DateRangePicker';
 
 const ReportFilters = ({ 
-  dateRange = { start: null, end: null }, // Add default value here
-  onDateRangeChange, 
-  organizationFilter, 
-  onOrganizationFilterChange,
-  organizations = [], // Add default for organizations too
-  showAdditionalFilters = false
+  filters = { dateRange: { start: null, end: null }, organization: 'all' },
+  onFilterChange,
+  organizations = []
 }) => {
   const [showFilters, setShowFilters] = useState(true);
   
+  // Handle date range changes
+  const handleDateRangeChange = (startDate, endDate) => {
+    onFilterChange({
+      ...filters,
+      dateRange: {
+        start: startDate,
+        end: endDate
+      }
+    });
+  };
+  
+  // Handle organization filter changes
+  const handleOrganizationChange = (value) => {
+    onFilterChange({
+      ...filters,
+      organization: value
+    });
+  };
+  
   return (
-    <div className="bg-white rounded-lg shadow p-6 mb-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Report Filters</h2>
+        <h2 className="text-sm font-medium text-gray-900 dark:text-white">Report Filters</h2>
         <button 
           onClick={() => setShowFilters(!showFilters)}
-          className="text-blue-500 text-sm"
+          className="text-blue-500 dark:text-blue-400 text-xs"
         >
           {showFilters ? 'Hide Filters' : 'Show Filters'}
         </button>
       </div>
       
       {showFilters && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Date Range
             </label>
             <DateRangePicker
-              startDate={dateRange?.start}
-              endDate={dateRange?.end}
-              onChange={onDateRangeChange}
+              startDate={filters.dateRange.start}
+              endDate={filters.dateRange.end}
+              onChange={handleDateRangeChange}
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Organization
             </label>
             <select
-              value={organizationFilter}
-              onChange={(e) => onOrganizationFilterChange(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
+              value={filters.organization}
+              onChange={(e) => handleOrganizationChange(e.target.value)}
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
             >
               <option value="all">All Organizations</option>
               {organizations.map(org => (
@@ -51,12 +67,6 @@ const ReportFilters = ({
               ))}
             </select>
           </div>
-          
-          {showAdditionalFilters && (
-            <>
-              {/* Status filter, priority filter, etc. */}
-            </>
-          )}
         </div>
       )}
     </div>

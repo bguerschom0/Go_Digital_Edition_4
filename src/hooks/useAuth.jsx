@@ -27,18 +27,7 @@ export const AuthProvider = ({ children }) => {
       const parsedUser = JSON.parse(storedUser);
       // Check if user is active
       if (parsedUser.is_active) {
-        // Ensure the user has the processed role from user_role_v4
-        if (!parsedUser.processed_role) {
-          const userWithRole = {
-            ...parsedUser,
-            role: parsedUser.user_role_v4 || mapLegacyRole(parsedUser.role),
-            processed_role: true
-          };
-          setUser(userWithRole);
-          localStorage.setItem('user', JSON.stringify(userWithRole));
-        } else {
-          setUser(parsedUser);
-        }
+        setUser(parsedUser);
         resetLogoutTimer();
       } else {
         // Clear user if account is not active
@@ -47,20 +36,6 @@ export const AuthProvider = ({ children }) => {
     }
     setLoading(false);
   }, []);
-
-  // Mapping from legacy roles to new roles
-  const mapLegacyRole = (legacyRole) => {
-    switch(legacyRole?.toLowerCase()) {
-      case 'administrator':
-        return 'administrator';
-      case 'user':
-        return 'user';
-      case 'organization':
-        return 'organization';
-      default:
-        return 'user'; // Default role
-    }
-  };
 
   // Reset the auto-logout timer
   const resetLogoutTimer = () => {
@@ -120,11 +95,10 @@ export const AuthProvider = ({ children }) => {
             })
             .eq('id', userData.id);
             
-          // Process the role for temporary password login
+          // Use only user_role_v4 for role
           const userWithRole = {
             ...userData,
-            role: userData.user_role_v4 || mapLegacyRole(userData.role),
-            processed_role: true,
+            role: userData.user_role_v4,
             failed_login_attempts: 0
           };
           
@@ -225,11 +199,10 @@ export const AuthProvider = ({ children }) => {
 
       if (updateError) console.error('Error updating last login:', updateError);
 
-      // Process the role from user_role_v4 or legacy role
+      // Use only user_role_v4 for role
       const userWithRole = {
         ...userData,
-        role: userData.user_role_v4 || mapLegacyRole(userData.role),
-        processed_role: true,
+        role: userData.user_role_v4,
         failed_login_attempts: 0
       };
 
@@ -279,11 +252,10 @@ export const AuthProvider = ({ children }) => {
 
       if (fetchError) throw fetchError;
 
-      // Process the role for the updated user
+      // Use only user_role_v4 for role
       const updatedUserWithRole = {
         ...updatedUser,
-        role: updatedUser.user_role_v4 || mapLegacyRole(updatedUser.role),
-        processed_role: true
+        role: updatedUser.user_role_v4
       };
 
       // Update user in state and localStorage

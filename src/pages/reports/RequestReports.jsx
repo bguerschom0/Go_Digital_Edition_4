@@ -513,17 +513,7 @@ const RequestReports = () => {
         {/* Date range indicator and filters - IMPROVED */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
           <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-gray-400" />
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {dateRangeText.start} to {dateRangeText.end}
-              </span>
-              {filters.organization !== 'all' && (
-                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 rounded-full">
-                  {organizations.find(org => org.id === filters.organization)?.name || 'Organization Filter Active'}
-                </span>
-              )}
-            </div>
+
           </div>
           
           <div className="p-4">

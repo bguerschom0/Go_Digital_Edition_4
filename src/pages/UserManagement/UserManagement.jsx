@@ -10,12 +10,16 @@ import {
   Check,
   FileSpreadsheet,
   FileText,
-  Loader2 
+  Loader2,
+  Key,
+  AlertTriangle,
+  Unlock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import useRoleAccess from '../../hooks/useRoleCheck';
+import UnlockAccountModal from '../../components/modals/UnlockAccountModal';
 
 // User Modal Component for Create/Edit
 const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
@@ -162,7 +166,6 @@ const UserModal = ({ isOpen, mode, user, onClose, onSubmit }) => {
     </div>
   );
 };
-
 // Temporary Password Modal Component
 const TempPasswordModal = ({ isOpen, onClose, tempPassword }) => {
   const [copied, setCopied] = useState(false);
@@ -243,8 +246,31 @@ const TempPasswordModal = ({ isOpen, onClose, tempPassword }) => {
   );
 };
 
+// Account Lock Status Component
+const AccountLockStatus = ({ user, onUnlock }) => {
+  if (!user.locked_at) return null;
+
+  const lockedDate = new Date(user.locked_at).toLocaleString();
+  
+  return (
+    <div className="mt-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300">
+      <div className="flex items-center gap-1.5 mb-1">
+        <AlertTriangle className="w-3.5 h-3.5" />
+        <span className="font-medium">Account locked</span>
+      </div>
+      <p>Locked on {lockedDate} due to failed login attempts</p>
+      <button
+        onClick={() => onUnlock(user)}
+        className="mt-1.5 flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+      >
+        <Key className="w-3 h-3" />
+        <span>Unlock account</span>
+      </button>
+    </div>
+  );
+};
 const UserManagement = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, unlockAccount } = useAuth();
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -258,6 +284,8 @@ const UserManagement = () => {
   const [itemsPerPage] = useState(10);
   const [statusFilter, setStatusFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [userToUnlock, setUserToUnlock] = useState(null);
 
   // Available roles (simplified to 3 roles)
   const roles = [
@@ -282,7 +310,6 @@ const UserManagement = () => {
 
     return tempPassword;
   };
-
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -293,8 +320,12 @@ const UserManagement = () => {
 
       // Apply status filter
       if (statusFilter !== 'all') {
-        const isActive = statusFilter === 'active';
-        query = query.eq('is_active', isActive);
+        if (statusFilter === 'locked') {
+          query = query.not('locked_at', 'is', null);
+        } else {
+          const isActive = statusFilter === 'active';
+          query = query.eq('is_active', isActive);
+        }
       }
       
       // Apply role filter using user_role_v4
@@ -418,6 +449,26 @@ const UserManagement = () => {
       console.error('Error deleting user:', error);
     }
   };
+  const handleUnlockAccount = async (userId) => {
+    try {
+      const { error } = await unlockAccount(userId);
+      
+      if (error) throw new Error(error);
+      
+      // Refresh the users list
+      fetchUsers();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error unlocking account:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const openUnlockModal = (user) => {
+    setUserToUnlock(user);
+    setShowUnlockModal(true);
+  };
 
   const exportUsers = async (format) => {
     try {
@@ -426,6 +477,9 @@ const UserManagement = () => {
         'Full Name': user.full_name,
         'Role': getUserRole(user),
         'Status': user.is_active ? 'Active' : 'Inactive',
+        'Login Attempts': user.failed_login_attempts || 0,
+        'Locked': user.locked_at ? 'Yes' : 'No',
+        'Locked At': user.locked_at ? new Date(user.locked_at).toLocaleString() : 'N/A',
         'Created At': new Date(user.created_at).toLocaleString(),
         'Created By': user.created_by,
         'Last Login': user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'
@@ -464,7 +518,6 @@ const UserManagement = () => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = users.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(users.length / itemsPerPage);
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -518,7 +571,7 @@ const UserManagement = () => {
                              bg-white dark:bg-gray-900 text-gray-900 dark:text-white
                              focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
                   />
-                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 </div>
               </div>
               
@@ -537,6 +590,7 @@ const UserManagement = () => {
                   <option value="all">All Statuses</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
+                  <option value="locked">Locked</option>
                 </select>
               </div>
               
@@ -562,7 +616,6 @@ const UserManagement = () => {
               </div>
             </div>
           </div>
-
           {/* Users Table */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
@@ -587,6 +640,9 @@ const UserManagement = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Last Login
                     </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Login Attempts
+                    </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Actions
                     </th>
@@ -595,7 +651,7 @@ const UserManagement = () => {
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {loading ? (
                     <tr>
-                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan="8" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                         <div className="flex justify-center items-center">
                           <Loader2 className="h-6 w-6 animate-spin mr-2" />
                           Loading users...
@@ -604,14 +660,14 @@ const UserManagement = () => {
                     </tr>
                   ) : currentItems.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan="8" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                         No users found
                       </td>
                     </tr>
                   ) : (
                     currentItems.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           <div className="flex items-center">
                             <div>
                               <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -620,6 +676,10 @@ const UserManagement = () => {
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {user.username}
                               </div>
+                              <AccountLockStatus 
+                                user={user} 
+                                onUnlock={openUnlockModal} 
+                              />
                             </div>
                           </div>
                         </td>
@@ -639,44 +699,73 @@ const UserManagement = () => {
                             {user.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {user.created_at 
                               ? new Date(user.created_at).toLocaleString() 
                               : 'N/A'}
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {user.updated_at 
-                              ? new Date(user.updated_at).toLocaleString() 
-                              : 'N/A'}
-                          </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {user.updated_at 
+                            ? new Date(user.updated_at).toLocaleString() 
+                            : 'N/A'}
+                        </td>
                         
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {user.last_login 
                             ? new Date(user.last_login).toLocaleString() 
                             : 'Never'}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {user.failed_login_attempts > 0 ? (
+                            <span className={`inline-flex items-center ${
+                              user.failed_login_attempts >= 3 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
+                            }`}>
+                              {user.failed_login_attempts}
+                              {user.failed_login_attempts >= 3 && (
+                                <AlertTriangle className="ml-1 w-4 h-4 text-amber-500" />
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 dark:text-gray-400">0</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-2">
-                            <button
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setModalMode('edit');
-                                setShowModal(true);
-                              }}
-                              className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleResetPassword(user.id)}
-                              className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                            >
-                              <Lock className="w-4 h-4" />
-                            </button>
+                            {user.locked_at ? (
+                              <button
+                                onClick={() => openUnlockModal(user)}
+                                className="text-blue-400 hover:text-blue-500 dark:hover:text-blue-300"
+                                title="Unlock Account"
+                              >
+                                <Unlock className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setModalMode('edit');
+                                    setShowModal(true);
+                                  }}
+                                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                  title="Edit User"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleResetPassword(user.id)}
+                                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                  title="Reset Password"
+                                >
+                                  <Lock className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
                             <button
                               onClick={() => handleDeleteUser(user.id)}
                               className="text-red-400 hover:text-red-500"
+                              title="Delete User"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -688,7 +777,6 @@ const UserManagement = () => {
                 </tbody>
               </table>
             </div>
-
             {/* Pagination */}
             {!loading && users.length > itemsPerPage && (
               <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
@@ -765,7 +853,6 @@ const UserManagement = () => {
           </div>
         </div>
       </div>
-
       {/* User Modal */}
       <UserModal
         isOpen={showModal}
@@ -783,6 +870,17 @@ const UserManagement = () => {
         isOpen={showTempPasswordModal}
         onClose={() => setShowTempPasswordModal(false)}
         tempPassword={currentTempPassword}
+      />
+
+      {/* Account Unlock Modal */}
+      <UnlockAccountModal
+        isOpen={showUnlockModal}
+        onClose={() => {
+          setShowUnlockModal(false);
+          setUserToUnlock(null);
+        }}
+        onUnlock={handleUnlockAccount}
+        user={userToUnlock}
       />
     </div>
   );

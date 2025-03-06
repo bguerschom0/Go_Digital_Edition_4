@@ -512,18 +512,12 @@ const RequestReports = () => {
         
         {/* Date range indicator and filters - IMPROVED */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
-          <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-
-          </div>
-          
-          <div className="p-4">
             {/* ReportFilters Component - Make sure this component is styled properly */}
             <ReportFilters 
               filters={filters}
               onFilterChange={handleFilterChange}
               organizations={organizations}
             />
-          </div>
         </div>
         
         {/* Error message */}

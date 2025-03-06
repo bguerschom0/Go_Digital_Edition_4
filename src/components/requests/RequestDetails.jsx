@@ -33,7 +33,7 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
   const [savingStatus, setSavingStatus] = useState(false);
   const [organizations, setOrganizations] = useState([]);
   
-  // Create notifications
+  // Create notification helper function
   const createNotification = async (userId, title, message, relatedRequestId = requestId) => {
     try {
       await supabase
@@ -152,8 +152,8 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
       supabase.removeChannel(requestSubscription);
     };
   }, [requestId]);
-  
-  // Fetch organizations when editing starts
+
+  // Fetch organizations when editing is activated
   useEffect(() => {
     const fetchOrganizations = async () => {
       if (!editing) return; // Only fetch when editing is active
@@ -172,7 +172,7 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
     };
     
     fetchOrganizations();
-  }, [editing]); // Only re-fetch when editing state changes
+  }, [editing]);
 
   // Download a file
   const downloadFile = async (filePath, fileName) => {
@@ -196,6 +196,33 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
       console.error('Error downloading file:', error);
       alert('Failed to download the file. Please try again.');
     }
+  };
+
+  // Permission checks
+  const canEditRequest = () => {
+    if (!user || !request) return false;
+    
+    // Administrators can edit any request
+    if (user.role === 'administrator') return true;
+    
+    // Regular users can only edit requests they created
+    if (user.role === 'user' && request.created_by === user.id) return true;
+    
+    // Organization users cannot edit requests
+    return false;
+  };
+  
+  const canDeleteRequest = () => {
+    if (!user || !request) return false;
+    
+    // Administrators can delete any request
+    if (user.role === 'administrator') return true;
+    
+    // Regular users can only delete requests they created
+    if (user.role === 'user' && request.created_by === user.id) return true;
+    
+    // Organization users cannot delete requests
+    return false;
   };
 
   // Update request data (for edit button)
@@ -358,42 +385,8 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
     const { name, value } = e.target;
     setEditData(prev => ({ ...prev, [name]: value }));
   };
-  
-  // Handle file upload completion and notifications
-  const handleFileUploadComplete = async (count) => {
-    if (count <= 0) return;
-    
-    // Create notification about file upload
-    if (request.created_by !== user.id) {
-      await createNotification(
-        request.created_by,
-        'New Files Uploaded',
-        `${count} new file${count > 1 ? 's were' : ' was'} uploaded to request ${request.reference_number} by ${user.full_name || 'a user'}.`
-      );
-    }
-    
-    // Notify organization users
-    const { data: orgUsers } = await supabase
-      .from('v4_user_organizations')
-      .select('user_id')
-      .eq('organization_id', request.sender);
-      
-    if (orgUsers && orgUsers.length > 0) {
-      const notificationPromises = orgUsers
-        .filter(orgUser => orgUser.user_id !== user.id)
-        .map(orgUser => 
-          createNotification(
-            orgUser.user_id,
-            'New Files Uploaded',
-            `${count} new file${count > 1 ? 's were' : ' was'} uploaded to request ${request.reference_number}.`
-          )
-        );
-      
-      await Promise.all(notificationPromises);
-    }
-  };
-  
-  // Handle request deletion
+
+  // Delete request
   const handleDeleteRequest = async () => {
     if (!window.confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
       return;
@@ -461,32 +454,38 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
     }
   };
 
-  // Check if current user can edit this request
-  const canEditRequest = () => {
-    if (!user || !request) return false;
+  // Handle file upload complete with notifications
+  const handleFileUploadComplete = async (count) => {
+    if (count <= 0) return;
     
-    // Administrators can edit any request
-    if (user.role === 'administrator') return true;
+    // Create notification about file upload
+    if (request.created_by !== user.id) {
+      await createNotification(
+        request.created_by,
+        'New Files Uploaded',
+        `${count} new file${count > 1 ? 's were' : ' was'} uploaded to request ${request.reference_number} by ${user.full_name || 'a user'}.`
+      );
+    }
     
-    // Regular users can only edit requests they created
-    if (user.role === 'user' && request.created_by === user.id) return true;
-    
-    // Organization users cannot edit requests
-    return false;
-  };
-  
-  // Check if current user can delete this request
-  const canDeleteRequest = () => {
-    if (!user || !request) return false;
-    
-    // Administrators can delete any request
-    if (user.role === 'administrator') return true;
-    
-    // Regular users can only delete requests they created
-    if (user.role === 'user' && request.created_by === user.id) return true;
-    
-    // Organization users cannot delete requests
-    return false;
+    // Notify organization users
+    const { data: orgUsers } = await supabase
+      .from('v4_user_organizations')
+      .select('user_id')
+      .eq('organization_id', request.sender);
+      
+    if (orgUsers && orgUsers.length > 0) {
+      const notificationPromises = orgUsers
+        .filter(orgUser => orgUser.user_id !== user.id)
+        .map(orgUser => 
+          createNotification(
+            orgUser.user_id,
+            'New Files Uploaded',
+            `${count} new file${count > 1 ? 's were' : ' was'} uploaded to request ${request.reference_number}.`
+          )
+        );
+      
+      await Promise.all(notificationPromises);
+    }
   };
 
   // Get status color
@@ -631,7 +630,7 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
               )}
             </div>
             
-            {/* Edit button (only if canEditRequest is true) */}
+            {/* Edit button */}
             {canEditRequest() && (
               <button
                 onClick={() => setEditing(!editing)}
@@ -644,7 +643,7 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
               </button>
             )}
             
-            {/* Delete button (only if canDeleteRequest is true) */}
+            {/* Delete button */}
             {canDeleteRequest() && (
               <button
                 onClick={handleDeleteRequest}
@@ -795,6 +794,8 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
                   disabled={saving}
                   className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
                            hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
+                           flex items-center gap-1 className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
+                           hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
                            flex items-center gap-1 disabled:opacity-50"
                 >
                   {saving ? (
@@ -936,7 +937,7 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
         </h3>
         
         <CommentSection 
-          requestId={request.id} 
+          requestId={request.id}
           onCommentAdded={async (comment) => {
             // Create notification about new comment
             if (request.created_by !== user.id) {

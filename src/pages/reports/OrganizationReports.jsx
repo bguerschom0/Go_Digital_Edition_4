@@ -118,13 +118,6 @@ const OrganizationReports = () => {
     // Add to Promise.all array:
     fetchRecentRequests()
 
-    useEffect(() => {
-      if (selectedOrganization) {
-        fetchRecentRequests();
-      }
-    }, [selectedOrganization]);
-    
-
     const fetchOrganizations = async () => {
       try {
         const { data, error } = await supabase
@@ -305,6 +298,12 @@ const OrganizationReports = () => {
     
     fetchReportData();
   }, [organizations, selectedOrganization, dateRange]);
+
+  useEffect(() => {
+    if (selectedOrganization) {
+      fetchRecentRequests();
+    }
+  }, [selectedOrganization]);
 
   // Helper function to format status
   const formatStatus = (status) => {

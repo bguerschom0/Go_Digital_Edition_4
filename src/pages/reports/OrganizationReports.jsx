@@ -428,7 +428,7 @@ return (
             Please select an organization from the dropdown above to view detailed reports.
           </p>
         </div>
-      ) : orgData.length === 0 ? (
+      ) : orgRequestVolume.length === 0    ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-12 text-center">
           <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">

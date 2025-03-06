@@ -9,6 +9,9 @@ const supabase = createClient(
 
 const AuthContext = createContext(null);
 
+// Maximum number of failed login attempts allowed
+const MAX_LOGIN_ATTEMPTS = 5;
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
@@ -75,17 +78,28 @@ export const AuthProvider = ({ children }) => {
         .eq('username', username)
         .single();
 
-      if (userError) throw new Error('Invalid credentials');
+      if (userError) {
+        // User not found, return generic error
+        return { 
+          user: null, 
+          error: 'Invalid credentials',
+          attemptsLeft: null
+        };
+      }
 
       // Check user active status
       if (!userData.is_active) {
         return { 
           user: null, 
-          error: 'Account is not active. Please contact the administrator.',
-          accountInactive: true
+          error: 'Account is locked due to too many failed login attempts. Please contact an administrator.',
+          accountInactive: true,
+          attemptsLeft: 0
         };
       }
 
+      // Check failed login attempts
+      const currentAttempts = userData.failed_login_attempts || 0;
+      
       // First check if there's a valid temporary password
       if (userData?.temp_password) {
         const tempPasswordValid = 
@@ -93,11 +107,21 @@ export const AuthProvider = ({ children }) => {
           new Date(userData.temp_password_expires) > new Date();
 
         if (tempPasswordValid) {
+          // Reset failed login attempts on successful login
+          await supabase
+            .from('users')
+            .update({ 
+              failed_login_attempts: 0,
+              last_login: new Date().toISOString() 
+            })
+            .eq('id', userData.id);
+            
           // Process the role for temporary password login
           const userWithRole = {
             ...userData,
             role: userData.user_role_v4 || mapLegacyRole(userData.role),
-            processed_role: true
+            processed_role: true,
+            failed_login_attempts: 0
           };
           
           return { 
@@ -110,19 +134,87 @@ export const AuthProvider = ({ children }) => {
 
       // If no valid temp password, check regular password
       if (!userData.password) {
-        throw new Error('Invalid credentials');
+        // Increment failed login attempts
+        const newAttempts = currentAttempts + 1;
+        const attemptsLeft = MAX_LOGIN_ATTEMPTS - newAttempts;
+        
+        // Deactivate account if max attempts reached
+        if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+          await supabase
+            .from('users')
+            .update({ 
+              failed_login_attempts: newAttempts,
+              is_active: false,
+              locked_at: new Date().toISOString()
+            })
+            .eq('id', userData.id);
+            
+          return { 
+            user: null, 
+            error: 'Account has been locked due to too many failed login attempts. Please contact an administrator.',
+            accountLocked: true,
+            attemptsLeft: 0
+          };
+        }
+        
+        // Update failed attempts
+        await supabase
+          .from('users')
+          .update({ failed_login_attempts: newAttempts })
+          .eq('id', userData.id);
+          
+        return { 
+          user: null, 
+          error: `Invalid credentials. ${attemptsLeft} login ${attemptsLeft === 1 ? 'attempt' : 'attempts'} remaining.`,
+          attemptsLeft
+        };
       }
 
       const isValidPassword = await bcrypt.compare(password, userData.password);
 
       if (!isValidPassword) {
-        throw new Error('Invalid credentials');
+        // Increment failed login attempts
+        const newAttempts = currentAttempts + 1;
+        const attemptsLeft = MAX_LOGIN_ATTEMPTS - newAttempts;
+        
+        // Deactivate account if max attempts reached
+        if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+          await supabase
+            .from('users')
+            .update({ 
+              failed_login_attempts: newAttempts,
+              is_active: false,
+              locked_at: new Date().toISOString()
+            })
+            .eq('id', userData.id);
+            
+          return { 
+            user: null, 
+            error: 'Account has been locked due to too many failed login attempts. Please contact an administrator.',
+            accountLocked: true,
+            attemptsLeft: 0
+          };
+        }
+        
+        // Update failed attempts
+        await supabase
+          .from('users')
+          .update({ failed_login_attempts: newAttempts })
+          .eq('id', userData.id);
+          
+        return { 
+          user: null, 
+          error: `Invalid credentials. ${attemptsLeft} login ${attemptsLeft === 1 ? 'attempt' : 'attempts'} remaining.`,
+          attemptsLeft
+        };
       }
 
+      // Reset failed login attempts on successful login
       // Update last login
       const { error: updateError } = await supabase
         .from('users')
         .update({ 
+          failed_login_attempts: 0,
           last_login: new Date().toISOString() 
         })
         .eq('id', userData.id);
@@ -133,7 +225,8 @@ export const AuthProvider = ({ children }) => {
       const userWithRole = {
         ...userData,
         role: userData.user_role_v4 || mapLegacyRole(userData.role),
-        processed_role: true
+        processed_role: true,
+        failed_login_attempts: 0
       };
 
       // Store the processed user in localStorage
@@ -163,6 +256,7 @@ export const AuthProvider = ({ children }) => {
           temp_password: null,
           temp_password_expires: null,
           password_change_required: false,
+          failed_login_attempts: 0, // Reset failed attempts when password is changed
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);
@@ -193,6 +287,26 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Password update error:', error);
+      return { error: error.message };
+    }
+  };
+
+  const unlockAccount = async (userId) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          is_active: true,
+          failed_login_attempts: 0,
+          locked_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('Error unlocking account:', error);
       return { error: error.message };
     }
   };
@@ -231,7 +345,8 @@ export const AuthProvider = ({ children }) => {
       loading, 
       login, 
       logout, 
-      updatePassword 
+      updatePassword,
+      unlockAccount
     }}>
       {children}
     </AuthContext.Provider>

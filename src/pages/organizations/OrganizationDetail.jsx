@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Building, 
-  User, 
   Mail, 
   Phone, 
   MapPin, 
@@ -24,9 +23,9 @@ const OrganizationDetail = () => {
   
   const [formData, setFormData] = useState({
     name: '',
-    contact_person: '',
-    email: '',
     phone: '',
+    phone2: '',
+    email: '',
     address: '',
     is_active: true
   });
@@ -158,17 +157,6 @@ const OrganizationDetail = () => {
                 <Building className="w-6 h-6 mr-2" />
                 {isNewOrg ? 'New Organization' : 'Edit Organization'}
               </h1>
-              
-              {!isNewOrg && (
-                <Link
-                  to={`/organizations/users?org=${id}`}
-                  className="flex items-center px-3 py-1.5 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300
-                         rounded-lg transition-colors text-sm hover:bg-indigo-200 dark:hover:bg-indigo-800/30"
-                >
-                  <Users className="w-4 h-4 mr-1" />
-                  Manage Users
-                </Link>
-              )}
             </div>
           </div>
           
@@ -201,14 +189,32 @@ const OrganizationDetail = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Contact Person
+                    Phone
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                     <input
                       type="text"
-                      name="contact_person"
-                      value={formData.contact_person || ''}
+                      name="phone"
+                      value={formData.phone || ''}
+                      onChange={handleChange}
+                      className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 
+                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                               focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Phone 2
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                    <input
+                      type="text"
+                      name="phone2"
+                      value={formData.phone2 || ''}
                       onChange={handleChange}
                       className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 
                                bg-white dark:bg-gray-900 text-gray-900 dark:text-white
@@ -227,24 +233,6 @@ const OrganizationDetail = () => {
                       type="email"
                       name="email"
                       value={formData.email || ''}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 
-                               bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                               focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Phone
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                    <input
-                      type="text"
-                      name="phone"
-                      value={formData.phone || ''}
                       onChange={handleChange}
                       className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 
                                bg-white dark:bg-gray-900 text-gray-900 dark:text-white

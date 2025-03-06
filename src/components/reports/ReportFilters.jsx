@@ -2,11 +2,11 @@ import { useState } from 'react';
 import DateRangePicker from './DateRangePicker';
 
 const ReportFilters = ({ 
-  dateRange, 
+  dateRange = { start: null, end: null }, // Add default value here
   onDateRangeChange, 
   organizationFilter, 
   onOrganizationFilterChange,
-  organizations,
+  organizations = [], // Add default for organizations too
   showAdditionalFilters = false
 }) => {
   const [showFilters, setShowFilters] = useState(true);
@@ -30,8 +30,8 @@ const ReportFilters = ({
               Date Range
             </label>
             <DateRangePicker
-              startDate={dateRange.start}
-              endDate={dateRange.end}
+              startDate={dateRange?.start}
+              endDate={dateRange?.end}
               onChange={onDateRangeChange}
             />
           </div>
@@ -52,7 +52,6 @@ const ReportFilters = ({
             </select>
           </div>
           
-          {/* Additional filters can be shown conditionally */}
           {showAdditionalFilters && (
             <>
               {/* Status filter, priority filter, etc. */}

@@ -529,13 +529,13 @@ const RequestReports = () => {
         </div>
       </div>
       
-      {/* Inline Filters */}
+{/* Inline Filters - Improved */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
         <div className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-sm font-medium text-gray-900 dark:text-white">Report Filters</h2>
           <button 
             onClick={() => setShowFilters(!showFilters)}
-            className="text-blue-500 dark:text-blue-400 text-xs flex items-center"
+            className="text-gray-500 dark:text-gray-400 text-xs flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
           >
             {showFilters ? (
               <>
@@ -551,53 +551,47 @@ const RequestReports = () => {
         
         {showFilters && (
           <div className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Range
+            <div className="flex flex-col md:flex-row items-start md:items-end gap-4">
+              <div className="w-full md:w-1/3">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Start Date
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Start Date
-                    </label>
-                    <DatePicker
-                      selected={parseISO(filters.dateRange.start)}
-                      onChange={(date) => {
-                        setFilters({
-                          ...filters,
-                          dateRange: {
-                            ...filters.dateRange,
-                            start: format(date, 'yyyy-MM-dd')
-                          }
-                        });
-                      }}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      End Date
-                    </label>
-                    <DatePicker
-                      selected={parseISO(filters.dateRange.end)}
-                      onChange={(date) => {
-                        setFilters({
-                          ...filters,
-                          dateRange: {
-                            ...filters.dateRange,
-                            end: format(date, 'yyyy-MM-dd')
-                          }
-                        });
-                      }}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                    />
-                  </div>
-                </div>
+                <DatePicker
+                  selected={parseISO(filters.dateRange.start)}
+                  onChange={(date) => {
+                    setFilters({
+                      ...filters,
+                      dateRange: {
+                        ...filters.dateRange,
+                        start: format(date, 'yyyy-MM-dd')
+                      }
+                    });
+                  }}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
               </div>
               
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div className="w-full md:w-1/3">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  End Date
+                </label>
+                <DatePicker
+                  selected={parseISO(filters.dateRange.end)}
+                  onChange={(date) => {
+                    setFilters({
+                      ...filters,
+                      dateRange: {
+                        ...filters.dateRange,
+                        end: format(date, 'yyyy-MM-dd')
+                      }
+                    });
+                  }}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+              
+              <div className="w-full md:w-1/3">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                   Organization
                 </label>
                 <select
@@ -615,16 +609,6 @@ const RequestReports = () => {
                     <option key={org.id} value={org.id}>{org.name}</option>
                   ))}
                 </select>
-                
-                {/* Add button to quickly apply filters */}
-                <div className="mt-4 flex justify-end">
-                  <button
-                    onClick={handleRefresh}
-                    className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors"
-                  >
-                    Apply Filters
-                  </button>
-                </div>
               </div>
             </div>
           </div>

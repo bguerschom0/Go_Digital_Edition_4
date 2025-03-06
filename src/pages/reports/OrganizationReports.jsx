@@ -51,7 +51,7 @@ const OrganizationReports = () => {
   
   // Organizations data
   const [organizations, setOrganizations] = useState([]);
-  const [selectedOrganization, setSelectedOrganization] = useState('all');
+  const [selectedOrganization, setSelectedOrganization] = useState('');
   
   // Report data
   const [orgRequestVolume, setOrgRequestVolume] = useState([]);
@@ -87,9 +87,18 @@ const OrganizationReports = () => {
       const completed = statusDistribution.find(s => s.name === 'Completed')?.value || 0;
       
       setOrgSummary({
-        name: org?.name || '',
+        name: org?.name || 'All Organizations',
         totalRequests: summaryMetrics.totalRequests,
         completedRequests: completed,
+        pendingRequests: summaryMetrics.pendingRequests,
+        completionRate: summaryMetrics.completionRate,
+        avgResponseDays: summaryMetrics.avgResponseTime
+      });
+    } else {
+      setOrgSummary({
+        name: 'All Organizations',
+        totalRequests: summaryMetrics.totalRequests,
+        completedRequests: statusDistribution.find(s => s.name === 'Completed')?.value || 0,
         pendingRequests: summaryMetrics.pendingRequests,
         completionRate: summaryMetrics.completionRate,
         avgResponseDays: summaryMetrics.avgResponseTime
@@ -100,8 +109,8 @@ const OrganizationReports = () => {
 
   const fetchRecentRequests = async () => {
     try {
-      // Only fetch if we have a specific organization (not 'all')
-      if (selectedOrganization === 'all' || !selectedOrganization) {
+      // Only fetch if we have a specific organization (not empty)
+      if (!selectedOrganization) {
         setRecentRequests([]);
         return;
       }
@@ -163,7 +172,7 @@ const OrganizationReports = () => {
               .gte('date_received', dateRange.start)
               .lte('date_received', dateRange.end);
               
-            if (selectedOrganization !== 'all') {
+            if (selectedOrganization) {
               query = query.eq('sender', selectedOrganization);
             }
             
@@ -202,16 +211,25 @@ const OrganizationReports = () => {
         const fetchResponseTimes = async () => {
           try {
             // Try RPC first
-            let query = supabase.rpc('v4_get_avg_response_times_by_org', {
+            const options = {
               start_date: dateRange.start,
               end_date: dateRange.end
-            });
+            };
             
-            if (selectedOrganization !== 'all') {
-              query = query.eq('org_id', selectedOrganization);
+            let responsePromise;
+            
+            if (selectedOrganization) {
+              // If organization is selected, use eq filter
+              responsePromise = supabase
+                .rpc('v4_get_avg_response_times_by_org', options)
+                .eq('org_id', selectedOrganization);
+            } else {
+              // If no organization selected, get all
+              responsePromise = supabase
+                .rpc('v4_get_avg_response_times_by_org', options);
             }
             
-            const { data, error } = await query;
+            const { data, error } = await responsePromise;
             
             // If RPC fails, use direct query
             if (error) {
@@ -230,7 +248,7 @@ const OrganizationReports = () => {
                 .lte('date_received', dateRange.end)
                 .not('completed_at', 'is', null);
                 
-              if (selectedOrganization !== 'all') {
+              if (selectedOrganization) {
                 fallbackQuery = fallbackQuery.eq('sender', selectedOrganization);
               }
                 
@@ -282,11 +300,13 @@ const OrganizationReports = () => {
         const fetchMonthlyActivity = async () => {
           try {
             // Try RPC first
-            const { data, error } = await supabase.rpc('v4_get_monthly_requests_by_org', {
+            const options = {
               start_date: dateRange.start,
               end_date: dateRange.end,
-              org_id: selectedOrganization !== 'all' ? selectedOrganization : null
-            });
+              org_id: selectedOrganization || null
+            };
+            
+            const { data, error } = await supabase.rpc('v4_get_monthly_requests_by_org', options);
             
             // If RPC fails, use direct query
             if (error) {
@@ -299,7 +319,7 @@ const OrganizationReports = () => {
                 .gte('date_received', dateRange.start)
                 .lte('date_received', dateRange.end);
                 
-              if (selectedOrganization !== 'all') {
+              if (selectedOrganization) {
                 query = query.eq('sender', selectedOrganization);
               }
                 
@@ -373,7 +393,7 @@ const OrganizationReports = () => {
               .gte('date_received', dateRange.start)
               .lte('date_received', dateRange.end);
               
-            if (selectedOrganization !== 'all') {
+            if (selectedOrganization) {
               query = query.eq('sender', selectedOrganization);
             }
             
@@ -423,13 +443,13 @@ const OrganizationReports = () => {
         const fetchAvgResponseTime = async () => {
           try {
             // Try RPC first
-            let query = supabase.rpc('v4_get_avg_response_time', {
+            const options = {
               start_date: dateRange.start,
               end_date: dateRange.end,
-              org_id: selectedOrganization !== 'all' ? selectedOrganization : null
-            });
+              org_id: selectedOrganization || null
+            };
             
-            const { data, error } = await query;
+            const { data, error } = await supabase.rpc('v4_get_avg_response_time', options);
             
             // If RPC fails, use direct query
             if (error) {
@@ -443,7 +463,7 @@ const OrganizationReports = () => {
                 .lte('date_received', dateRange.end)
                 .not('completed_at', 'is', null);
                 
-              if (selectedOrganization !== 'all') {
+              if (selectedOrganization) {
                 directQuery = directQuery.eq('sender', selectedOrganization);
               }
               
@@ -491,7 +511,7 @@ const OrganizationReports = () => {
         ]);
         
         // Fetch recent requests separately since it depends on organization
-        if (selectedOrganization && selectedOrganization !== 'all') {
+        if (selectedOrganization) {
           await fetchRecentRequests();
         } else {
           setRecentRequests([]);
@@ -589,8 +609,8 @@ const OrganizationReports = () => {
       XLSX.utils.book_append_sheet(wb, statusSheet, 'Status Distribution');
       
       // Generate filename with date and selected organization
-      const orgName = selectedOrganization !== 'all' 
-        ? organizations.find(org => org.id === selectedOrganization)?.name || 'Selected' 
+      const orgName = selectedOrganization
+        ? organizations.find(org => org.id === selectedOrganization)?.name || 'Selected'
         : 'All';
       const filename = `organization_report_${orgName}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
       
@@ -601,6 +621,7 @@ const OrganizationReports = () => {
       alert('Failed to export data. Please try again.');
     }
   };
+
 return (
   <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

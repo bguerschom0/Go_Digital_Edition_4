@@ -116,11 +116,6 @@ const OrganizationReports = () => {
 
   // Fetch organizations list
   useEffect(() => {
-
-    
-    // Add to Promise.all array:
-    fetchRecentRequests()
-
     const fetchOrganizations = async () => {
       try {
         const { data, error } = await supabase
@@ -139,7 +134,6 @@ const OrganizationReports = () => {
     
     fetchOrganizations();
   }, []);
-
   // Fetch report data
   useEffect(() => {
     const fetchReportData = async () => {
@@ -151,134 +145,298 @@ const OrganizationReports = () => {
       try {
         // Fetch organization request volume
         const fetchOrgVolume = async () => {
-          let query = supabase
-            .from('v4_requests')
-            .select('sender, organizations!v4_requests_sender_fkey(name), count(*)', { count: 'exact' })
-            .gte('date_received', dateRange.start)
-            .lte('date_received', dateRange.end)
-            .groupBy('sender, organizations!v4_requests_sender_fkey(name)');
+          try {
+            let query = supabase
+              .from('v4_requests')
+              .select('sender, v4_organizations!v4_requests_sender_fkey(name), count(*)', { count: 'exact' })
+              .gte('date_received', dateRange.start)
+              .lte('date_received', dateRange.end)
+              .groupBy('sender, v4_organizations!v4_requests_sender_fkey(name)');
+              
+            if (selectedOrganization !== 'all') {
+              query = query.eq('sender', selectedOrganization);
+            }
             
-          if (selectedOrganization !== 'all') {
-            query = query.eq('sender', selectedOrganization);
+            const { data, error } = await query;
+            
+            if (error) throw error;
+            
+            // Process data for chart
+            const processedData = data.map((item, index) => ({
+              name: item.v4_organizations.name,
+              value: parseInt(item.count),
+              color: COLORS[index % COLORS.length]
+            }));
+            
+            setOrgRequestVolume(processedData);
+          } catch (err) {
+            console.error('Error in fetchOrgVolume:', err);
+            setOrgRequestVolume([]);
           }
-          
-          const { data, error } = await query;
-          
-          if (error) throw error;
-          
-          // Process data for chart
-          const processedData = data.map((item, index) => ({
-            name: item.organizations.name,
-            value: parseInt(item.count),
-            color: COLORS[index % COLORS.length]
-          }));
-          
-          setOrgRequestVolume(processedData);
         };
 
-        // Fetch organization response times
+        // Fetch organization response times - with fallback
         const fetchResponseTimes = async () => {
-          let query = supabase.rpc('v4_get_avg_response_times_by_org', {
-            start_date: dateRange.start,
-            end_date: dateRange.end
-          });
-          
-          if (selectedOrganization !== 'all') {
-            query = query.eq('org_id', selectedOrganization);
+          try {
+            // Try RPC first
+            let query = supabase.rpc('v4_get_avg_response_times_by_org', {
+              start_date: dateRange.start,
+              end_date: dateRange.end
+            });
+            
+            if (selectedOrganization !== 'all') {
+              query = query.eq('org_id', selectedOrganization);
+            }
+            
+            const { data, error } = await query;
+            
+            // If RPC fails, use direct query
+            if (error) {
+              console.log('RPC failed, using direct query instead');
+              
+              // Direct query as fallback
+              const { data: requestsData, error: requestsError } = await supabase
+                .from('v4_requests')
+                .select(`
+                  sender,
+                  v4_organizations!v4_requests_sender_fkey(id, name),
+                  date_received,
+                  completed_at
+                `)
+                .gte('date_received', dateRange.start)
+                .lte('date_received', dateRange.end)
+                .not('completed_at', 'is', null);
+                
+              if (requestsError) throw requestsError;
+              
+              // Group and calculate average
+              const orgGroups = {};
+              requestsData.forEach(request => {
+                if (!request.v4_organizations) return;
+                
+                const orgId = request.sender;
+                const orgName = request.v4_organizations.name;
+                if (!orgGroups[orgId]) {
+                  orgGroups[orgId] = { org_id: orgId, org_name: orgName, total: 0, count: 0 };
+                }
+                
+                const days = (new Date(request.completed_at) - new Date(request.date_received)) / (1000 * 60 * 60 * 24);
+                orgGroups[orgId].total += days;
+                orgGroups[orgId].count += 1;
+              });
+              
+              const processedData = Object.values(orgGroups).map((org, index) => ({
+                name: org.org_name,
+                value: parseFloat((org.total / org.count).toFixed(1)),
+                color: COLORS[index % COLORS.length]
+              }));
+              
+              setOrgResponseTimes(processedData);
+              return;
+            }
+            
+            // Process data from RPC
+            const processedData = (data || []).map((item, index) => ({
+              name: item.org_name,
+              value: parseFloat(item.avg_days.toFixed(1)),
+              color: COLORS[index % COLORS.length]
+            }));
+            
+            setOrgResponseTimes(processedData);
+          } catch (err) {
+            console.error('Error in fetchResponseTimes:', err);
+            setOrgResponseTimes([]);
           }
-          
-          const { data, error } = await query;
-          
-          if (error) throw error;
-          
-          // Process data for chart
-          const processedData = (data || []).map((item, index) => ({
-            name: item.org_name,
-            value: parseFloat(item.avg_days.toFixed(1)),
-            color: COLORS[index % COLORS.length]
-          }));
-          
-          setOrgResponseTimes(processedData);
         };
 
-        // Fetch monthly activity by organization
+        // Fetch monthly activity by organization - with fallback
         const fetchMonthlyActivity = async () => {
-          const { data, error } = await supabase.rpc('v4_get_monthly_requests_by_org', {
-            start_date: dateRange.start,
-            end_date: dateRange.end,
-            org_id: selectedOrganization !== 'all' ? selectedOrganization : null
-          });
-          
-          if (error) throw error;
-          
-          // Process data for chart
-          const processedData = (data || []).map(item => ({
-            month: format(parseISO(item.month), 'MMM yyyy'),
-            total: parseInt(item.total_count),
-            completed: parseInt(item.completed_count),
-            pending: parseInt(item.pending_count),
-            in_progress: parseInt(item.in_progress_count)
-          }));
-          
-          setOrgMonthlyActivity(processedData);
+          try {
+            // Try RPC first
+            const { data, error } = await supabase.rpc('v4_get_monthly_requests_by_org', {
+              start_date: dateRange.start,
+              end_date: dateRange.end,
+              org_id: selectedOrganization !== 'all' ? selectedOrganization : null
+            });
+            
+            // If RPC fails, use direct query
+            if (error) {
+              console.log('RPC failed, using direct query for monthly data');
+              
+              // Direct query as fallback
+              let query = supabase
+                .from('v4_requests')
+                .select('date_received, status')
+                .gte('date_received', dateRange.start)
+                .lte('date_received', dateRange.end);
+                
+              if (selectedOrganization !== 'all') {
+                query = query.eq('sender', selectedOrganization);
+              }
+                
+              const { data: requestsData, error: requestsError } = await query;
+                
+              if (requestsError) throw requestsError;
+              
+              // Group by month and status
+              const monthlyGroups = {};
+              requestsData.forEach(request => {
+                // Format to YYYY-MM
+                const monthKey = request.date_received.substring(0, 7);
+                if (!monthlyGroups[monthKey]) {
+                  monthlyGroups[monthKey] = {
+                    total: 0,
+                    completed: 0,
+                    pending: 0,
+                    in_progress: 0
+                  };
+                }
+                
+                monthlyGroups[monthKey].total += 1;
+                
+                // Increment status counter
+                const status = request.status || 'pending';
+                monthlyGroups[monthKey][status] = (monthlyGroups[monthKey][status] || 0) + 1;
+              });
+              
+              // Convert to array for chart
+              const processedData = Object.entries(monthlyGroups)
+                .map(([month, data]) => ({
+                  month: format(new Date(`${month}-01`), 'MMM yyyy'),
+                  total: data.total,
+                  completed: data.completed || 0,
+                  pending: data.pending || 0,
+                  in_progress: data.in_progress || 0
+                }))
+                .sort((a, b) => {
+                  // Sort chronologically
+                  const dateA = new Date(a.month);
+                  const dateB = new Date(b.month);
+                  return dateA - dateB;
+                });
+              
+              setOrgMonthlyActivity(processedData);
+              return;
+            }
+            
+            // Process data from RPC
+            const processedData = (data || []).map(item => ({
+              month: format(parseISO(item.month), 'MMM yyyy'),
+              total: parseInt(item.total_count),
+              completed: parseInt(item.completed_count),
+              pending: parseInt(item.pending_count),
+              in_progress: parseInt(item.in_progress_count)
+            }));
+            
+            setOrgMonthlyActivity(processedData);
+          } catch (err) {
+            console.error('Error in fetchMonthlyActivity:', err);
+            setOrgMonthlyActivity([]);
+          }
         };
-
         // Fetch status distribution
         const fetchStatusDistribution = async () => {
-          let query = supabase
-            .from('v4_requests')
-            .select('status, count(*)', { count: 'exact' })
-            .gte('date_received', dateRange.start)
-            .lte('date_received', dateRange.end)
-            .groupBy('status');
+          try {
+            let query = supabase
+              .from('v4_requests')
+              .select('status, count(*)', { count: 'exact' })
+              .gte('date_received', dateRange.start)
+              .lte('date_received', dateRange.end)
+              .groupBy('status');
+              
+            if (selectedOrganization !== 'all') {
+              query = query.eq('sender', selectedOrganization);
+            }
             
-          if (selectedOrganization !== 'all') {
-            query = query.eq('sender', selectedOrganization);
-          }
-          
-          const { data, error } = await query;
-          
-          if (error) throw error;
-          
-          // Process data for chart
-          const processedData = (data || []).map(item => ({
-            name: formatStatus(item.status),
-            value: parseInt(item.count),
-            color: STATUS_COLORS[item.status] || '#8884D8'
-          }));
-          
-          setStatusDistribution(processedData);
-          
-          // Update summary metrics
-          const totalRequests = processedData.reduce((sum, item) => sum + item.value, 0);
-          const completedCount = processedData.find(item => item.name === 'Completed')?.value || 0;
-          const pendingCount = processedData.find(item => item.name === 'Pending')?.value || 0;
-          
-          setSummaryMetrics(prev => ({
-            ...prev,
-            totalRequests,
-            completionRate: totalRequests > 0 ? (completedCount / totalRequests * 100).toFixed(1) : 0,
-            pendingRequests: pendingCount
-          }));
-        };
-
-        // Fetch average response time
-        const fetchAvgResponseTime = async () => {
-          let query = supabase.rpc('v4_get_avg_response_time', {
-            start_date: dateRange.start,
-            end_date: dateRange.end,
-            org_id: selectedOrganization !== 'all' ? selectedOrganization : null
-          });
-          
-          const { data, error } = await query;
-          
-          if (error) throw error;
-          
-          if (data && data[0] && data[0].avg_days !== null) {
+            const { data, error } = await query;
+            
+            if (error) throw error;
+            
+            // Process data for chart
+            const processedData = (data || []).map(item => ({
+              name: formatStatus(item.status),
+              value: parseInt(item.count),
+              color: STATUS_COLORS[item.status] || '#8884D8'
+            }));
+            
+            setStatusDistribution(processedData);
+            
+            // Update summary metrics
+            const totalRequests = processedData.reduce((sum, item) => sum + item.value, 0);
+            const completedCount = processedData.find(item => item.name === 'Completed')?.value || 0;
+            const pendingCount = processedData.find(item => item.name === 'Pending')?.value || 0;
+            
             setSummaryMetrics(prev => ({
               ...prev,
-              avgResponseTime: parseFloat(data[0].avg_days.toFixed(1))
+              totalRequests,
+              completionRate: totalRequests > 0 ? (completedCount / totalRequests * 100).toFixed(1) : 0,
+              pendingRequests: pendingCount
             }));
+          } catch (err) {
+            console.error('Error in fetchStatusDistribution:', err);
+            setStatusDistribution([]);
+          }
+        };
+
+        // Fetch average response time - with fallback
+        const fetchAvgResponseTime = async () => {
+          try {
+            // Try RPC first
+            let query = supabase.rpc('v4_get_avg_response_time', {
+              start_date: dateRange.start,
+              end_date: dateRange.end,
+              org_id: selectedOrganization !== 'all' ? selectedOrganization : null
+            });
+            
+            const { data, error } = await query;
+            
+            // If RPC fails, use direct query
+            if (error) {
+              console.log('RPC failed, using direct query for avg response time');
+              
+              // Direct query as fallback
+              let directQuery = supabase
+                .from('v4_requests')
+                .select('date_received, completed_at')
+                .gte('date_received', dateRange.start)
+                .lte('date_received', dateRange.end)
+                .not('completed_at', 'is', null);
+                
+              if (selectedOrganization !== 'all') {
+                directQuery = directQuery.eq('sender', selectedOrganization);
+              }
+              
+              const { data: requestsData, error: requestsError } = await directQuery;
+              
+              if (requestsError) throw requestsError;
+              
+              // Calculate average
+              if (requestsData && requestsData.length > 0) {
+                let totalDays = 0;
+                requestsData.forEach(request => {
+                  const days = (new Date(request.completed_at) - new Date(request.date_received)) / (1000 * 60 * 60 * 24);
+                  totalDays += days;
+                });
+                
+                const avgDays = parseFloat((totalDays / requestsData.length).toFixed(1));
+                
+                setSummaryMetrics(prev => ({
+                  ...prev,
+                  avgResponseTime: avgDays
+                }));
+              }
+              return;
+            }
+            
+            // Process data from RPC
+            if (data && data[0] && data[0].avg_days !== null) {
+              setSummaryMetrics(prev => ({
+                ...prev,
+                avgResponseTime: parseFloat(data[0].avg_days.toFixed(1))
+              }));
+            }
+          } catch (err) {
+            console.error('Error in fetchAvgResponseTime:', err);
           }
         };
 
@@ -288,7 +446,8 @@ const OrganizationReports = () => {
           fetchResponseTimes(),
           fetchMonthlyActivity(),
           fetchStatusDistribution(),
-          fetchAvgResponseTime()
+          fetchAvgResponseTime(),
+          fetchRecentRequests()
         ]);
         
       } catch (err) {
@@ -401,8 +560,7 @@ const OrganizationReports = () => {
       alert('Failed to export data. Please try again.');
     }
   };
-
-return (
+  return (
   <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
@@ -515,7 +673,7 @@ return (
             Please select an organization from the dropdown above to view detailed reports.
           </p>
         </div>
-      ) : orgRequestVolume.length === 0    ? (
+      ) : orgRequestVolume.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-12 text-center">
           <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
@@ -651,7 +809,7 @@ return (
                     nameKey="name"
                     label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                   >
-                    {statusData.map((entry, index) => (
+                    {statusDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -660,6 +818,12 @@ return (
               </ResponsiveContainer>
             </div>
           </motion.div>
+        </div>
+      )}
+    </div>
+  </div>
+);
+  </motion.div>
           
           {/* Monthly Trends */}
           <motion.div

@@ -4,7 +4,7 @@ import ReportFilters from '../../components/reports/ReportFilters';
 import ReportChart from '../../components/reports/ReportChart';
 import ReportTable from '../../components/reports/ReportTable';
 import ReportExport from '../../components/reports/ReportExport';
-import { subMonths, format } from 'date-fns';
+import { subMonths, format, parseISO } from 'date-fns';
 import { Loader2, Clock, UserCheck, FileUp, BarChart } from 'lucide-react';
 
 const PerformanceReports = () => {
@@ -70,43 +70,82 @@ const PerformanceReports = () => {
     fetchReportData();
   }, [dateRange, reportType]);
   
-  // Fetch response time data
+  // Fetch response time data - MODIFIED TO USE DIRECT QUERIES
   const fetchResponseTimeData = async () => {
-    // Average response time by priority
-    const { data: priorityData, error: priorityError } = await supabase.rpc(
-      'get_avg_response_time_by_priority',
-      { 
-        start_date: dateRange.start,
-        end_date: dateRange.end
+    try {
+      // Fetch requests with date_received and date_completed
+      const { data: requestsData, error: requestsError } = await supabase
+        .from('v4_requests')
+        .select(`
+          priority,
+          date_received,
+          date_completed,
+          organization_id,
+          v4_organizations(id, name)
+        `)
+        .gte('date_received', dateRange.start)
+        .lte('date_received', dateRange.end)
+        .not('date_completed', 'is', null);
+      
+      if (requestsError) {
+        console.error('Error fetching requests data:', requestsError);
+        setResponseTimeData({ priorityData: [], orgData: [] });
+        return;
       }
-    );
-    
-    if (priorityError) {
-      console.error('Error fetching priority response time:', priorityError);
-      return;
+      
+      // Calculate average response time by priority
+      const priorityGroups = {};
+      requestsData.forEach(request => {
+        const priority = request.priority || 'unknown';
+        if (!priorityGroups[priority]) {
+          priorityGroups[priority] = { total: 0, count: 0 };
+        }
+        
+        const days = (new Date(request.date_completed) - new Date(request.date_received)) / (1000 * 60 * 60 * 24);
+        priorityGroups[priority].total += days;
+        priorityGroups[priority].count += 1;
+      });
+      
+      const priorityData = Object.entries(priorityGroups).map(([priority, data]) => ({
+        priority,
+        avg_days: data.count > 0 ? parseFloat((data.total / data.count).toFixed(2)) : 0
+      }));
+      
+      // Calculate average response time by organization
+      const orgGroups = {};
+      requestsData.forEach(request => {
+        if (!request.v4_organizations) return;
+        
+        const orgName = request.v4_organizations.name;
+        const orgId = request.v4_organizations.id;
+        if (!orgGroups[orgId]) {
+          orgGroups[orgId] = { name: orgName, total: 0, count: 0 };
+        }
+        
+        const days = (new Date(request.date_completed) - new Date(request.date_received)) / (1000 * 60 * 60 * 24);
+        orgGroups[orgId].total += days;
+        orgGroups[orgId].count += 1;
+      });
+      
+      const orgData = Object.values(orgGroups).map(org => ({
+        name: org.name,
+        avg_days: org.count > 0 ? parseFloat((org.total / org.count).toFixed(2)) : 0
+      }));
+      
+      // Sort by average days
+      orgData.sort((a, b) => b.avg_days - a.avg_days);
+      
+      setResponseTimeData({
+        priorityData,
+        orgData
+      });
+    } catch (error) {
+      console.error('Error processing response time data:', error);
+      setResponseTimeData({ priorityData: [], orgData: [] });
     }
-    
-    // Average response time by organization
-    const { data: orgData, error: orgError } = await supabase.rpc(
-      'get_avg_response_time_by_org',
-      { 
-        start_date: dateRange.start,
-        end_date: dateRange.end
-      }
-    );
-    
-    if (orgError) {
-      console.error('Error fetching org response time:', orgError);
-      return;
-    }
-    
-    setResponseTimeData({
-      priorityData: priorityData || [],
-      orgData: orgData || []
-    });
   };
   
-  // Fetch user performance data
+  // Fetch user performance data - THIS STAYS THE SAME
   const fetchUserPerformanceData = async () => {
     // Requests processed by user
     const { data: userData, error: userError } = await supabase
@@ -143,7 +182,10 @@ const PerformanceReports = () => {
       }
       
       userStats[userId].total += 1;
-      userStats[userId][item.status] += 1;
+      
+      // Increment status counter (defaulting to 0 if status doesn't exist yet)
+      const status = item.status || 'pending';
+      userStats[userId][status] = (userStats[userId][status] || 0) + 1;
     });
     
     // Convert to array and add completion rate
@@ -160,29 +202,50 @@ const PerformanceReports = () => {
     setUserPerformance(userPerformanceArray);
   };
   
-  // Fetch volume trend data
+  // Fetch volume trend data - MODIFIED TO USE DIRECT QUERY
   const fetchVolumeData = async () => {
-    // Requests by month
-    const { data: monthlyData, error: monthlyError } = await supabase.rpc(
-      'get_requests_by_month',
-      { 
-        start_date: dateRange.start,
-        end_date: dateRange.end
+    try {
+      // Fetch requests grouped by date_received
+      const { data: requestsData, error: requestsError } = await supabase
+        .from('v4_requests')
+        .select('date_received')
+        .gte('date_received', dateRange.start)
+        .lte('date_received', dateRange.end);
+      
+      if (requestsError) {
+        console.error('Error fetching volume data:', requestsError);
+        setVolumeData([]);
+        return;
       }
-    );
-    
-    if (monthlyError) {
-      console.error('Error fetching monthly trends:', monthlyError);
-      return;
+      
+      // Group by month
+      const monthlyGroups = {};
+      requestsData.forEach(request => {
+        const monthKey = format(parseISO(request.date_received), 'yyyy-MM');
+        if (!monthlyGroups[monthKey]) {
+          monthlyGroups[monthKey] = { count: 0 };
+        }
+        monthlyGroups[monthKey].count += 1;
+      });
+      
+      // Convert to array for chart
+      const formattedData = Object.entries(monthlyGroups)
+        .map(([month, data]) => ({
+          month: format(parseISO(`${month}-01`), 'MMM yyyy'),
+          count: data.count
+        }))
+        .sort((a, b) => {
+          // Sort chronologically
+          const dateA = new Date(a.month);
+          const dateB = new Date(b.month);
+          return dateA - dateB;
+        });
+      
+      setVolumeData(formattedData);
+    } catch (error) {
+      console.error('Error processing volume data:', error);
+      setVolumeData([]);
     }
-    
-    // Format data for chart
-    const formattedData = monthlyData?.map(item => ({
-      month: format(new Date(item.month), 'MMM yyyy'),
-      count: item.count
-    })) || [];
-    
-    setVolumeData(formattedData);
   };
   
   // Export report data

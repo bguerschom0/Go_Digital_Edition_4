@@ -13,6 +13,23 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-4xl' }) => 
     }
   };
 
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscKey = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    
+    if (isOpen) {
+      window.addEventListener('keydown', handleEscKey);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleEscKey);
+    };
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -56,6 +73,22 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-4xl' }) => 
   );
 };
 
+// Helper function to create notifications
+const createNotification = async (userId, title, message, relatedRequestId) => {
+  try {
+    await supabase
+      .from('v4_notifications')
+      .insert([{
+        user_id: userId,
+        title,
+        message,
+        related_request_id: relatedRequestId
+      }]);
+  } catch (error) {
+    console.error('Error creating notification:', error);
+  }
+};
+
 const ModalRequestForm = ({ isOpen, onClose, onSuccess }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -79,6 +112,33 @@ const ModalRequestForm = ({ isOpen, onClose, onSuccess }) => {
         .select();
         
       if (error) throw error;
+      
+      // Send notifications to organization users
+      const newRequestId = data[0].id;
+      const orgId = requestData.sender;
+      const refNum = requestData.reference_number;
+      
+      // Get all users from the organization
+      const { data: orgUsers } = await supabase
+        .from('v4_user_organizations')
+        .select('user_id')
+        .eq('organization_id', orgId);
+        
+      if (orgUsers && orgUsers.length > 0) {
+        // Create notifications for each organization user
+        const notificationPromises = orgUsers
+          .filter(orgUser => orgUser.user_id !== user.id) // Don't notify current user
+          .map(orgUser => 
+            createNotification(
+              orgUser.user_id,
+              'New Request',
+              `A new request (${refNum}) has been created by ${user.full_name || 'a user'}.`,
+              newRequestId
+            )
+          );
+        
+        await Promise.all(notificationPromises);
+      }
       
       // Call success callback
       if (onSuccess) {

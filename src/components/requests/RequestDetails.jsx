@@ -792,9 +792,7 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
                   type="button"
                   onClick={handleSaveChanges}
                   disabled={saving}
-                  className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
-                           hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
-                           flex items-center gap-1 className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
+                   className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
                            hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
                            flex items-center gap-1 disabled:opacity-50"
                 >

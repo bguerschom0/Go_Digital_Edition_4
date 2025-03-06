@@ -106,6 +106,13 @@ const RequestReports = () => {
     fetchOrganizations();
   }, []);
 
+  // Format status for display
+  const formatStatus = (status) => {
+    return status.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
   // Fetch report data based on filters
   const fetchReportData = async (isRefreshing = false) => {
     try {
@@ -117,28 +124,31 @@ const RequestReports = () => {
       
       setError(null);
       
-      // 1. Status Distribution Query
-      let statusQuery = supabase
+      // Base query for all requests within date range
+      let baseQuery = supabase
         .from('v4_requests')
-        .select('status, count')
+        .select('*') // Select all fields
         .gte('date_received', filters.dateRange.start)
         .lte('date_received', filters.dateRange.end);
         
       // Apply organization filter if not 'all'
       if (filters.organization !== 'all') {
-        statusQuery = statusQuery.eq('sender', filters.organization);
+        baseQuery = baseQuery.eq('sender', filters.organization);
       }
       
-      const { data: statusResults, error: statusError } = await statusQuery;
-      if (statusError) throw statusError;
+      // Fetch all filtered requests
+      const { data: allRequests, error: requestsError } = await baseQuery;
       
-      // Format status data for chart
-      const formattedStatusData = Object.entries(
-        statusResults.reduce((acc, item) => {
-          acc[item.status] = (acc[item.status] || 0) + 1;
-          return acc;
-        }, {})
-      ).map(([status, count]) => ({
+      if (requestsError) throw requestsError;
+      
+      // Process status distribution
+      const statusCounts = {};
+      allRequests.forEach(request => {
+        const status = request.status || 'unknown';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+      
+      const formattedStatusData = Object.entries(statusCounts).map(([status, count]) => ({
         name: formatStatus(status),
         value: count,
         color: STATUS_COLORS[status] || '#8884D8'
@@ -147,39 +157,38 @@ const RequestReports = () => {
       setStatusDistribution(formattedStatusData);
       
       // Calculate totals
-      const totalCount = formattedStatusData.reduce((sum, item) => sum + item.value, 0);
+      const totalCount = allRequests.length;
       setTotalRequests(totalCount);
       
-      const completedCount = formattedStatusData.find(item => item.name === 'Completed')?.value || 0;
+      const completedCount = allRequests.filter(r => r.status === 'completed').length;
       setCompletedRequests(completedCount);
       
-      const pendingCount = formattedStatusData.find(item => item.name === 'Pending')?.value || 0;
+      const pendingCount = allRequests.filter(r => r.status === 'pending').length;
       setPendingRequests(pendingCount);
       
-      const inProgressCount = formattedStatusData.find(item => item.name === 'In Progress')?.value || 0;
+      const inProgressCount = allRequests.filter(r => r.status === 'in_progress').length;
       setInProgressRequests(inProgressCount);
       
-      // 2. Organization Distribution Query
-      let orgQuery = supabase
-        .from('v4_requests')
-        .select('sender, organizations(name)')
-        .gte('date_received', filters.dateRange.start)
-        .lte('date_received', filters.dateRange.end);
+      // Fetch organizations data separately for organization names
+      const { data: orgsData, error: orgsError } = await supabase
+        .from('v4_organizations')
+        .select('id, name');
+        
+      if (orgsError) throw orgsError;
       
-      if (filters.organization !== 'all') {
-        orgQuery = orgQuery.eq('sender', filters.organization);
-      }
+      // Create a map of org IDs to names
+      const orgMap = {};
+      orgsData.forEach(org => {
+        orgMap[org.id] = org.name;
+      });
       
-      const { data: orgResults, error: orgError } = await orgQuery;
-      if (orgError) throw orgError;
-
-      // Then process the results manually
-      const orgCounts = orgResults.reduce((acc, item) => {
-        const orgName = item.organizations?.name || 'Unknown';
-        acc[orgName] = (acc[orgName] || 0) + 1;
-        return acc;
-      }, {});
-
+      // Process organization distribution
+      const orgCounts = {};
+      allRequests.forEach(request => {
+        const orgName = orgMap[request.sender] || 'Unknown';
+        orgCounts[orgName] = (orgCounts[orgName] || 0) + 1;
+      });
+      
       const formattedOrgData = Object.entries(orgCounts).map(([name, value], index) => ({
         name,
         value,
@@ -199,7 +208,7 @@ const RequestReports = () => {
       
       setOrganizationDistribution(formattedOrgData);
       
-      // 3. Monthly Trends
+      // Process monthly trends
       const dateStart = parseISO(filters.dateRange.start);
       const dateEnd = parseISO(filters.dateRange.end);
       
@@ -222,23 +231,9 @@ const RequestReports = () => {
         };
       });
       
-      // Get monthly request data
-      let monthlyQuery = supabase
-        .from('v4_requests')
-        .select('date_received, status')
-        .gte('date_received', filters.dateRange.start)
-        .lte('date_received', filters.dateRange.end);
-        
-      if (filters.organization !== 'all') {
-        monthlyQuery = monthlyQuery.eq('sender', filters.organization);
-      }
-      
-      const { data: monthlyResults, error: monthlyError } = await monthlyQuery;
-      if (monthlyError) throw monthlyError;
-      
       // Process monthly data
       const monthlyData = initialMonthlyData.map(monthData => {
-        const monthRequests = monthlyResults.filter(request => {
+        const monthRequests = allRequests.filter(request => {
           const requestMonth = format(parseISO(request.date_received), 'yyyy-MM');
           return requestMonth === monthData.monthKey;
         });
@@ -254,31 +249,22 @@ const RequestReports = () => {
       
       setMonthlyTrends(monthlyData);
       
-      // 4. Average Response Time
-      let responseTimeQuery = supabase
-        .from('v4_requests')
-        .select('date_received, completed_at')
-        .eq('status', 'completed')
-        .not('completed_at', 'is', null)
-        .gte('date_received', filters.dateRange.start)
-        .lte('date_received', filters.dateRange.end);
-        
-      if (filters.organization !== 'all') {
-        responseTimeQuery = responseTimeQuery.eq('sender', filters.organization);
-      }
+      // Calculate average response time
+      const completedRequests = allRequests.filter(r => 
+        r.status === 'completed' && r.completed_at
+      );
       
-      const { data: responseTimeResults, error: responseTimeError } = await responseTimeQuery;
-      if (responseTimeError) throw responseTimeError;
-      
-      if (responseTimeResults.length > 0) {
-        const totalDays = responseTimeResults.reduce((sum, request) => {
+      if (completedRequests.length > 0) {
+        const totalDays = completedRequests.reduce((sum, request) => {
+          if (!request.date_received || !request.completed_at) return sum;
+          
           const receivedDate = parseISO(request.date_received);
           const completedDate = parseISO(request.completed_at);
           const daysDiff = Math.round((completedDate - receivedDate) / (1000 * 60 * 60 * 24));
           return sum + daysDiff;
         }, 0);
         
-        setAvgResponseTime(Math.round(totalDays / responseTimeResults.length));
+        setAvgResponseTime(Math.round(totalDays / completedRequests.length));
       } else {
         setAvgResponseTime(null);
       }
@@ -296,13 +282,6 @@ const RequestReports = () => {
   useEffect(() => {
     fetchReportData();
   }, [filters, sortConfig]);
-
-  // Format status for display
-  const formatStatus = (status) => {
-    return status.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
 
   // Handle filter change
   const handleFilterChange = (newFilters) => {
@@ -546,6 +525,186 @@ const RequestReports = () => {
                     <Tooltip content={<CustomTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Organization distribution chart */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <BarChartIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Requests by Organization
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSort('name')}
+                    className="text-xs flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                  >
+                    Name
+                    {sortConfig.key === 'name' && (
+                      sortConfig.direction === 'asc' ? 
+                        <ArrowUp className="w-3 h-3 ml-1" /> : 
+                        <ArrowDown className="w-3 h-3 ml-1" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleSort('count')}
+                    className="text-xs flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                  >
+                    Count
+                    {sortConfig.key === 'count' && (
+                      sortConfig.direction === 'asc' ? 
+                        <ArrowUp className="w-3 h-3 ml-1" /> : 
+                        <ArrowDown className="w-3 h-3 ml-1" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={organizationDistribution}
+                    layout="vertical"
+                    margin={{
+                      top: 5,
+                      right: 30,
+                      left: 100,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" />
+                    <YAxis 
+                      type="category" 
+                      dataKey="name" 
+                      width={80}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" name="Requests">
+                      {organizationDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Monthly trends chart */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Monthly Request Trends
+                </h2>
+              </div>
+              
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={monthlyTrends}
+                    margin={{
+                      top: 10,
+                      right: 30,
+                      left: 0,
+                      bottom: 0,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Area type="monotone" dataKey="total" name="Total" fill="#8884d8" stroke="#8884d8" fillOpacity={0.2} />
+                    <Area type="monotone" dataKey="completed" name="Completed" fill={STATUS_COLORS.completed} stroke={STATUS_COLORS.completed} fillOpacity={0.6} />
+                    <Area type="monotone" dataKey="in_progress" name="In Progress" fill={STATUS_COLORS.in_progress} stroke={STATUS_COLORS.in_progress} fillOpacity={0.6} />
+                    <Area type="monotone" dataKey="pending" name="Pending" fill={STATUS_COLORS.pending} stroke={STATUS_COLORS.pending} fillOpacity={0.6} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Key metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Total Requests */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Total Requests
+                    </p>
+                    <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                      {formatNumber(totalRequests)}
+                    </h3>
+                  </div>
+                  <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <Filter className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Completion Rate */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Completion Rate
+                    </p>
+                    <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                      {completionRate}%
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      {formatNumber(completedRequests)} completed
+                    </p>
+                  </div>
+                  <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <CheckSquare className="h-5 w-5 text-green-500 dark:text-green-400" />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Average Response Time */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Avg. Response Time
+                    </p>
+                    <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                      {avgResponseTime !== null ? `${avgResponseTime} days` : 'N/A'}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      For completed requests
+                    </p>
+                  </div>
+                  <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <Clock className="h-5 w-5 text-purple-500 dark:text-purple-400" />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Pending Rate */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Pending Rate
+                    </p>
+                    <h3 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                      {pendingRate}%
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      {formatNumber(pendingRequests)} pending
+                    </p>
+                  </div>
+                  <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                    <AlertCircle className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

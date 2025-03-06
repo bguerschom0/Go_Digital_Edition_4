@@ -62,8 +62,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Reset the auto-logout timer
   const resetLogoutTimer = () => {
+    // Clear any existing timers
     clearTimeout(logoutTimer.current);
+    
+    // Set a new timer for 5 minutes of inactivity
     logoutTimer.current = setTimeout(() => {
       logout();
     }, 5 * 60 * 1000); // 5 minutes of inactivity
@@ -231,6 +235,9 @@ export const AuthProvider = ({ children }) => {
 
       // Store the processed user in localStorage
       localStorage.setItem('user', JSON.stringify(userWithRole));
+      
+      // Start the auto-logout timer
+      resetLogoutTimer();
 
       return { 
         user: userWithRole, 
@@ -282,6 +289,8 @@ export const AuthProvider = ({ children }) => {
       // Update user in state and localStorage
       setUser(updatedUserWithRole);
       localStorage.setItem('user', JSON.stringify(updatedUserWithRole));
+      
+      // Reset the auto-logout timer
       resetLogoutTimer();
 
       return { error: null };
@@ -325,16 +334,19 @@ export const AuthProvider = ({ children }) => {
       }
     };
     
+    // Add event listeners for user activity
     window.addEventListener('mousemove', resetTimerOnActivity);
     window.addEventListener('keydown', resetTimerOnActivity);
     window.addEventListener('click', resetTimerOnActivity);
     window.addEventListener('scroll', resetTimerOnActivity);
 
+    // Clean up event listeners on unmount
     return () => {
       window.removeEventListener('mousemove', resetTimerOnActivity);
       window.removeEventListener('keydown', resetTimerOnActivity);
       window.removeEventListener('click', resetTimerOnActivity);
       window.removeEventListener('scroll', resetTimerOnActivity);
+      clearTimeout(logoutTimer.current);
     };
   }, [user]);
 
@@ -346,7 +358,8 @@ export const AuthProvider = ({ children }) => {
       login, 
       logout, 
       updatePassword,
-      unlockAccount
+      unlockAccount,
+      resetLogoutTimer 
     }}>
       {children}
     </AuthContext.Provider>

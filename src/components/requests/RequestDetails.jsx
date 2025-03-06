@@ -24,6 +24,7 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
   const [requestFiles, setRequestFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [organizations, setOrganizations] = useState([]);
   const [editing, setEditing] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [editData, setEditData] = useState({});
@@ -134,6 +135,26 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
       supabase.removeChannel(requestSubscription);
     };
   }, [requestId]);
+
+  useEffect(() => {
+  const fetchOrganizations = async () => {
+    if (!editing) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('v4_organizations')
+        .select('id, name')
+        .order('name');
+        
+      if (error) throw error;
+      setOrganizations(data || []);
+    } catch (error) {
+      console.error('Error fetching organizations:', error);
+    }
+  };
+  
+  fetchOrganizations();
+}, [editing]);
 
   // Download a file
   const downloadFile = async (filePath, fileName) => {
@@ -399,83 +420,157 @@ const RequestDetails = ({ requestId, onClose, onUpdate }) => {
           </div>
         </div>
         
-        {/* Editing form */}
-        {editing && (
-          <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Subject / Request Type
-                </label>
-                <input
-                  type="text"
-                  name="subject"
-                  value={editData.subject}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                           focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Priority
-                </label>
-                <select
-                  name="priority"
-                  value={editData.priority}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                           bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                           focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-                >
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={editData.description || ''}
-                onChange={handleInputChange}
-                rows="3"
-                className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setEditing(false)}
-                className="px-3 py-1 text-sm border border-gray-200 dark:border-gray-700 rounded
-                         text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveChanges}
-                disabled={saving}
-                className="px-3 py-1 text-sm bg-black text-white dark:bg-white dark:text-black rounded
-                         hover:bg-gray-800 dark:hover:bg-gray-200 flex items-center gap-1"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </button>
-            </div>
+{/* Editing form */}
+{editing && (
+  <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+    <form className="space-y-4">
+      {/* Row 1: Ref Number, Date, Organization */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Reference Number */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Reference Number*
+          </label>
+          <input
+            type="text"
+            name="reference_number"
+            value={request.reference_number}
+            disabled={true}
+            className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                     bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white cursor-not-allowed"
+          />
+        </div>
+        
+        {/* Date Received */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Date Received*
+          </label>
+          <div className="relative">
+            <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="date"
+              name="date_received"
+              value={editData.date_received}
+              onChange={handleInputChange}
+              className="w-full h-9 pl-8 pr-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                       bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+            />
           </div>
-        )}
+        </div>
+        
+        {/* Sender Organization */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Sender Organization*
+          </label>
+          <select
+            name="sender"
+            value={editData.sender}
+            onChange={handleInputChange}
+            className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+          >
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      
+      {/* Row 2: Subject and Priority */}
+      <div className="grid grid-cols-4 gap-4">
+        {/* Subject */}
+        <div className="col-span-3">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Subject / Request Type*
+          </label>
+          <input
+            type="text"
+            name="subject"
+            value={editData.subject}
+            onChange={handleInputChange}
+            className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+          />
+        </div>
+        
+        {/* Priority */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Priority
+          </label>
+          <select
+            name="priority"
+            value={editData.priority}
+            onChange={handleInputChange}
+            className="w-full h-9 px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                     bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+          >
+            <option value="low">Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+      </div>
+      
+      {/* Row 3: Description */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Description <span className="text-gray-500 dark:text-gray-400 font-normal">(Optional)</span>
+        </label>
+        <textarea
+          name="description"
+          value={editData.description || ''}
+          onChange={handleInputChange}
+          rows="3"
+          className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-gray-700
+                   bg-white dark:bg-gray-900 text-gray-900 dark:text-white
+                   focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+        />
+      </div>
+      
+      {/* Buttons - placed after description */}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          disabled={saving}
+          className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 
+                   dark:hover:text-white transition-colors disabled:opacity-50 border border-gray-200 
+                   dark:border-gray-700 rounded"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSaveChanges}
+          disabled={saving}
+          className="px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded
+                   hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
+                   flex items-center gap-1 disabled:opacity-50"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </button>
+      </div>
+    </form>
+  </div>
+)}
       </div>
       
       {/* Files Section */}

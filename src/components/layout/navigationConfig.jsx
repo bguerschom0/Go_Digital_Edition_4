@@ -28,24 +28,7 @@ export const roleBasedNavigation = {
     {
       name: 'Requests',
       path: '/requests',
-      icon: FileText,
-      children: [
-        {
-          name: 'All Requests',
-          path: '/requests',
-          icon: List
-        },
-        {
-          name: 'Pending Requests',
-          path: '/requests?status=pending',
-          icon: Clock
-        },
-        {
-          name: 'Completed Requests',
-          path: '/requests?status=completed',
-          icon: CheckSquare
-        }
-      ]
+      icon: FileText
     },
     {
       name: 'Reports',
@@ -72,24 +55,7 @@ export const roleBasedNavigation = {
     {
       name: 'Organizations',
       path: '/organizations',
-      icon: Building,
-      children: [
-        {
-          name: 'All Organizations',
-          path: '/organizations',
-          icon: List
-        },
-        {
-          name: 'Add Organization',
-          path: '/organizations/new',
-          icon: Plus
-        },
-        {
-          name: 'Organization Users',
-          path: '/organizations/users',
-          icon: Users
-        }
-      ]
+      icon: Building
     },
     {
       name: 'User Management',
@@ -124,41 +90,12 @@ export const roleBasedNavigation = {
     {
       name: 'Requests',
       path: '/requests',
-      icon: FileText,
-      children: [
-        {
-          name: 'All Requests',
-          path: '/requests',
-          icon: List
-        },
-        {
-          name: 'Pending Requests',
-          path: '/requests?status=pending',
-          icon: Clock
-        },
-        {
-          name: 'Completed Requests',
-          path: '/requests?status=completed',
-          icon: CheckSquare
-        }
-      ]
+      icon: FileText
     },
     {
       name: 'Organizations',
       path: '/organizations',
-      icon: Building,
-      children: [
-        {
-          name: 'All Organizations',
-          path: '/organizations',
-          icon: List
-        },
-        {
-          name: 'View Organization Users',
-          path: '/organizations/users/view',
-          icon: Users
-        }
-      ]
+      icon: Building
     }
   ],
   
@@ -171,24 +108,7 @@ export const roleBasedNavigation = {
     {
       name: 'My Requests',
       path: '/requests',
-      icon: FileText,
-      children: [
-        {
-          name: 'All Requests',
-          path: '/requests',
-          icon: List
-        },
-        {
-          name: 'Pending Requests',
-          path: '/requests?status=pending',
-          icon: Clock
-        },
-        {
-          name: 'Completed Requests',
-          path: '/requests?status=completed',
-          icon: CheckSquare
-        }
-      ]
+      icon: FileText
     },
     {
       name: 'Organization Profile',

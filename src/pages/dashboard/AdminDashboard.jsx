@@ -9,16 +9,17 @@ import {
   Users, 
   UserCheck, 
   FileText, 
-  Settings, 
-  Clock, 
+  Building, 
+  Clock,
   CheckSquare,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  BarChart as BarChartIcon
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../config/supabase';
 import { StatCard } from '../../components/common/StatCard';
-import { format, subDays } from 'date-fns';
+import { format, parseISO, subDays } from 'date-fns';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 const STATUS_COLORS = {
@@ -35,7 +36,7 @@ const AdminDashboard = () => {
     totalRequests: 0,
     pendingRequests: 0,
     completedRequests: 0,
-    urgentRequests: 0
+    totalOrganizations: 0
   });
   const [userRoleStats, setUserRoleStats] = useState([]);
   const [requestStatusStats, setRequestStatusStats] = useState([]);
@@ -76,18 +77,26 @@ const AdminDashboard = () => {
       // Fetch user role distribution
       const { data: roleData } = await supabase
         .from('users')
-        .select('user_role_v4');
+        .select('User_Role_V4');
 
       // Process role distribution data
-      const roleCounts = roleData.reduce((acc, { role }) => {
+      const roleCounts = roleData.reduce((acc, user) => {
+        const role = user.User_Role_V4 || 'user'; // Default to user if not set
         acc[role] = (acc[role] || 0) + 1;
         return acc;
       }, {});
 
       const roleStatsArray = Object.entries(roleCounts).map(([name, value]) => ({
-        name,
+        name: formatRoleName(name),
         value
       }));
+
+      setUserRoleStats(roleStatsArray);
+
+      // Fetch organization count
+      const { count: totalOrganizations } = await supabase
+        .from('v4_organizations')
+        .select('*', { count: 'exact' });
 
       // Fetch request statistics
       const { count: totalRequests } = await supabase
@@ -98,7 +107,7 @@ const AdminDashboard = () => {
       const { count: pendingRequests } = await supabase
         .from('v4_requests')
         .select('*', { count: 'exact' })
-        .eq('status', 'pending');
+        .in('status', ['pending', 'in_progress']);
 
       // Fetch completed requests
       const { count: completedRequests } = await supabase
@@ -106,28 +115,24 @@ const AdminDashboard = () => {
         .select('*', { count: 'exact' })
         .eq('status', 'completed');
 
-      // Fetch urgent requests
-      const { count: urgentRequests } = await supabase
-        .from('v4_requests')
-        .select('*', { count: 'exact' })
-        .eq('priority', 'urgent');
-
       // Fetch request status distribution
       const { data: statusData } = await supabase
         .from('v4_requests')
         .select('status');
 
       // Process status distribution data
-      const statusCounts = statusData.reduce((acc, { status }) => {
+      const statusCounts = statusData?.reduce((acc, { status }) => {
         acc[status] = (acc[status] || 0) + 1;
         return acc;
-      }, {});
+      }, {}) || {};
 
       const statusStatsArray = Object.entries(statusCounts).map(([name, value]) => ({
         name: formatStatus(name),
         value,
         color: STATUS_COLORS[name] || '#8884D8'
       }));
+
+      setRequestStatusStats(statusStatsArray);
 
       // Fetch recent requests
       const { data: recentRequestsData } = await supabase
@@ -145,28 +150,40 @@ const AdminDashboard = () => {
         .limit(5);
 
       // Process recent requests
-      const processedRecentRequests = recentRequestsData.map(request => ({
+      const processedRecentRequests = recentRequestsData?.map(request => ({
         ...request,
-        sender: request.organizations.name
-      }));
+        sender: request.organizations?.name
+      })) || [];
 
-      setUserRoleStats(roleStatsArray);
-      setRequestStatusStats(statusStatsArray);
       setRecentRequests(processedRecentRequests);
       
       setStats({
-        totalUsers,
-        activeUsers,
-        totalRequests,
-        pendingRequests,
-        completedRequests,
-        urgentRequests
+        totalUsers: totalUsers || 0,
+        activeUsers: activeUsers || 0,
+        totalRequests: totalRequests || 0,
+        pendingRequests: pendingRequests || 0,
+        completedRequests: completedRequests || 0,
+        totalOrganizations: totalOrganizations || 0
       });
 
     } catch (error) {
       console.error('Error fetching admin dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Format role name for display
+  const formatRoleName = (role) => {
+    switch(role) {
+      case 'administrator':
+        return 'Administrator';
+      case 'organization':
+        return 'Organization';
+      case 'user':
+        return 'User';
+      default:
+        return role.charAt(0).toUpperCase() + role.slice(1);
     }
   };
 
@@ -243,7 +260,7 @@ const AdminDashboard = () => {
                 {getGreeting()}, {user?.full_name}
               </h1>
               <p className="mt-2 text-gray-600 dark:text-gray-400">
-                Welcome to Document Request Management System. Here's your overview.
+                Welcome to the Document Request Management System. Here's your overview.
               </p>
             </motion.div>
 
@@ -265,9 +282,36 @@ const AdminDashboard = () => {
                 icon={<FileText size={24} className="text-gray-600 dark:text-gray-300" />}
               />
               <StatCard
+                title="Organizations"
+                value={stats.totalOrganizations}
+                icon={<Building size={24} className="text-gray-600 dark:text-gray-300" />}
+              />
+            </div>
+
+            {/* Request Status Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <StatCard
                 title="Pending Requests"
                 value={stats.pendingRequests}
-                icon={<Clock size={24} className="text-gray-600 dark:text-gray-300" />}
+                icon={<Clock size={24} className="text-yellow-500" />}
+                color="bg-yellow-50 dark:bg-yellow-900/10"
+                textColor="text-yellow-700 dark:text-yellow-300"
+              />
+              <StatCard
+                title="Completed Requests"
+                value={stats.completedRequests}
+                icon={<CheckSquare size={24} className="text-green-500" />}
+                color="bg-green-50 dark:bg-green-900/10"
+                textColor="text-green-700 dark:text-green-300"
+              />
+              <StatCard
+                title="Completion Rate"
+                value={stats.totalRequests > 0 
+                  ? `${Math.round((stats.completedRequests / stats.totalRequests) * 100)}%` 
+                  : '0%'}
+                icon={<BarChartIcon size={24} className="text-blue-500" />}
+                color="bg-blue-50 dark:bg-blue-900/10"
+                textColor="text-blue-700 dark:text-blue-300"
               />
             </div>
 
@@ -458,7 +502,7 @@ const AdminDashboard = () => {
                   to="/request-analytics"
                   className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                 >
-                  <BarChart className="h-6 w-6 text-green-500 mr-3" />
+                  <BarChartIcon className="h-6 w-6 text-green-500 mr-3" />
                   <div>
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white">Analytics</h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">View reports and insights</p>

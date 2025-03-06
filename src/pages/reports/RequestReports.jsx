@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { 
   BarChart as BarChartIcon, 
   PieChart as PieChartIcon,
@@ -119,11 +118,11 @@ const RequestReports = () => {
       setError(null);
       
       // 1. Status Distribution Query
-let statusQuery = supabase
-  .from('v4_requests')
-  .select('status', { count: 'exact' })
-  .gte('date_received', filters.dateRange.start)
-  .lte('date_received', filters.dateRange.end);
+      let statusQuery = supabase
+        .from('v4_requests')
+        .select('status, count')
+        .gte('date_received', filters.dateRange.start)
+        .lte('date_received', filters.dateRange.end);
         
       // Apply organization filter if not 'all'
       if (filters.organization !== 'all') {
@@ -134,10 +133,15 @@ let statusQuery = supabase
       if (statusError) throw statusError;
       
       // Format status data for chart
-      const formattedStatusData = statusResults.map(item => ({
-        name: formatStatus(item.status),
-        value: parseInt(item.count),
-        color: STATUS_COLORS[item.status] || '#8884D8'
+      const formattedStatusData = Object.entries(
+        statusResults.reduce((acc, item) => {
+          acc[item.status] = (acc[item.status] || 0) + 1;
+          return acc;
+        }, {})
+      ).map(([status, count]) => ({
+        name: formatStatus(status),
+        value: count,
+        color: STATUS_COLORS[status] || '#8884D8'
       }));
       
       setStatusDistribution(formattedStatusData);
@@ -156,24 +160,31 @@ let statusQuery = supabase
       setInProgressRequests(inProgressCount);
       
       // 2. Organization Distribution Query
-let orgQuery = supabase
-  .from('v4_requests')
-  .select('sender')
-  .gte('date_received', filters.dateRange.start)
-  .lte('date_received', filters.dateRange.end);
+      let orgQuery = supabase
+        .from('v4_requests')
+        .select('sender, organizations(name)')
+        .gte('date_received', filters.dateRange.start)
+        .lte('date_received', filters.dateRange.end);
+      
+      if (filters.organization !== 'all') {
+        orgQuery = orgQuery.eq('sender', filters.organization);
+      }
+      
+      const { data: orgResults, error: orgError } = await orgQuery;
+      if (orgError) throw orgError;
 
-// Then process the results manually
-const orgCounts = orgResults.reduce((acc, item) => {
-  const orgName = item.organizations?.name || 'Unknown';
-  acc[orgName] = (acc[orgName] || 0) + 1;
-  return acc;
-}, {});
+      // Then process the results manually
+      const orgCounts = orgResults.reduce((acc, item) => {
+        const orgName = item.organizations?.name || 'Unknown';
+        acc[orgName] = (acc[orgName] || 0) + 1;
+        return acc;
+      }, {});
 
-const formattedOrgData = Object.entries(orgCounts).map(([name, value], index) => ({
-  name,
-  value,
-  color: COLORS[index % COLORS.length]
-}));
+      const formattedOrgData = Object.entries(orgCounts).map(([name, value], index) => ({
+        name,
+        value,
+        color: COLORS[index % COLORS.length]
+      }))
       .sort((a, b) => {
         if (sortConfig.key === 'name') {
           return sortConfig.direction === 'asc' 
@@ -408,18 +419,6 @@ const formattedOrgData = Object.entries(orgCounts).map(([name, value], index) =>
   const formatNumber = (num) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
-
-  // Modify how you process the status results
-const formattedStatusData = Object.entries(
-  statusResults.reduce((acc, item) => {
-    acc[item.status] = (acc[item.status] || 0) + 1;
-    return acc;
-  }, {})
-).map(([status, count]) => ({
-  name: formatStatus(status),
-  value: count,
-  color: STATUS_COLORS[status] || '#8884D8'
-}));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">

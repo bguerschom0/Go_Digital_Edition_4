@@ -27,6 +27,9 @@ import {
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import { format, parseISO, subMonths } from 'date-fns';
+import { Link } from 'react-router-dom';
+import { ArrowRight, FileText, PieChart as PieChartIcon } from 'lucide-react';
+
 
 // Chart colors
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
@@ -55,6 +58,8 @@ const OrganizationReports = () => {
   const [orgResponseTimes, setOrgResponseTimes] = useState([]);
   const [orgMonthlyActivity, setOrgMonthlyActivity] = useState([]);
   const [statusDistribution, setStatusDistribution] = useState([]);
+  const [recentRequests, setRecentRequests] = useState([]);
+
   
   // Summary metrics
   const [summaryMetrics, setSummaryMetrics] = useState({
@@ -64,8 +69,60 @@ const OrganizationReports = () => {
     pendingRequests: 0
   });
 
+  const [orgSummary, setOrgSummary] = useState({
+    name: '',
+    totalRequests: 0,
+    completedRequests: 0,
+    pendingRequests: 0,
+    completionRate: 0,
+    avgResponseDays: null,
+    contactPerson: null,
+    email: null,
+    phone: null
+  });
+
+  useEffect(() => {
+    if (selectedOrganization && organizations.length > 0) {
+      const org = organizations.find(o => o.id === selectedOrganization);
+      const completed = statusDistribution.find(s => s.name === 'Completed')?.value || 0;
+      
+      setOrgSummary({
+        name: org?.name || '',
+        totalRequests: summaryMetrics.totalRequests,
+        completedRequests: completed,
+        pendingRequests: summaryMetrics.pendingRequests,
+        completionRate: summaryMetrics.completionRate,
+        avgResponseDays: summaryMetrics.avgResponseTime
+      });
+    }
+  }, [selectedOrganization, organizations, statusDistribution, summaryMetrics]);
+  
+  useEffect(() => {
+    if (selectedOrganization) {
+      fetchRecentRequests();
+    }
+  }, [selectedOrganization]);
+  
+
   // Fetch organizations list
   useEffect(() => {
+
+    const fetchRecentRequests = async () => {
+      const { data, error } = await supabase
+        .from('v4_requests')
+        .select('id, reference_number, date_received, subject, status, completed_at')
+        .eq('sender', selectedOrganization)
+        .order('date_received', { ascending: false })
+        .limit(10);
+    
+      if (error) throw error;
+      setRecentRequests(data || []);
+    };
+    
+    // Add to Promise.all array:
+    fetchRecentRequests()
+    
+
     const fetchOrganizations = async () => {
       try {
         const { data, error } = await supabase
@@ -253,6 +310,32 @@ const OrganizationReports = () => {
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow">
+          <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} className="text-sm text-gray-500 dark:text-gray-400">
+              {`${entry.name}: ${entry.value}`}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+  
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+      in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+      completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+  };
+  
 
   // Export data to Excel
   const exportToExcel = () => {
@@ -554,7 +637,7 @@ return (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={statusData}
+                    data={statusDistribution}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -591,7 +674,7 @@ return (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={monthlyData}
+                  data={orgMonthlyActivity}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />

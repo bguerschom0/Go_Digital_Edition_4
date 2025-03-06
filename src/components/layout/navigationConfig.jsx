@@ -36,11 +36,6 @@ export const roleBasedNavigation = {
           icon: List
         },
         {
-          name: 'New Request',
-          path: '/requests/new',
-          icon: Plus
-        },
-        {
           name: 'Pending Requests',
           path: '/requests?status=pending',
           icon: Clock
@@ -117,16 +112,6 @@ export const roleBasedNavigation = {
           icon: LayoutDashboard
         }
       ]
-    },
-    {
-      name: 'Notifications',
-      path: '/notifications',
-      icon: Bell
-    },
-    {
-      name: 'Settings',
-      path: '/settings',
-      icon: Settings
     }
   ],
   
@@ -147,11 +132,6 @@ export const roleBasedNavigation = {
           icon: List
         },
         {
-          name: 'New Request',
-          path: '/requests/new',
-          icon: Plus
-        },
-        {
           name: 'Pending Requests',
           path: '/requests?status=pending',
           icon: Clock
@@ -160,11 +140,6 @@ export const roleBasedNavigation = {
           name: 'Completed Requests',
           path: '/requests?status=completed',
           icon: CheckSquare
-        },
-        {
-          name: 'Upload Response',
-          path: '/requests?filter=assigned',
-          icon: Upload
         }
       ]
     },
@@ -184,11 +159,6 @@ export const roleBasedNavigation = {
           icon: Users
         }
       ]
-    },
-    {
-      name: 'Notifications',
-      path: '/notifications',
-      icon: Bell
     }
   ],
   
@@ -209,11 +179,6 @@ export const roleBasedNavigation = {
           icon: List
         },
         {
-          name: 'New Request',
-          path: '/requests/new',
-          icon: Plus
-        },
-        {
           name: 'Pending Requests',
           path: '/requests?status=pending',
           icon: Clock
@@ -229,11 +194,6 @@ export const roleBasedNavigation = {
       name: 'Organization Profile',
       path: '/organization-profile',
       icon: Building
-    },
-    {
-      name: 'Notifications',
-      path: '/notifications',
-      icon: Bell
     },
     {
       name: 'Contact Support',

@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Send, UserCircle, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-const CommentSection = ({ requestId }) => {
+const CommentSection = ({ requestId, onCommentAdded }) => {
   const { user } = useAuth();
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -106,7 +106,7 @@ const CommentSection = ({ requestId }) => {
   }, [newComment]);
 
   // Submit a new comment
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!newComment.trim()) return;
@@ -117,7 +117,7 @@ const CommentSection = ({ requestId }) => {
       // Determine if comment should be internal (only for admin/user roles)
       const isInternal = false; // Set to true if implementing internal-only comments
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('v4_comments')
         .insert([
           {
@@ -126,11 +126,17 @@ const CommentSection = ({ requestId }) => {
             content: newComment.trim(),
             is_internal: isInternal
           },
-        ]);
+        ])
+        .select(); // Add this to get back the inserted comment with its ID
         
       if (error) throw error;
       
       setNewComment('');
+      
+      // Call the comment notification callback if provided
+      if (onCommentAdded && data && data[0]) {
+        onCommentAdded(data[0]);
+      }
     } catch (error) {
       console.error('Error submitting comment:', error);
     } finally {

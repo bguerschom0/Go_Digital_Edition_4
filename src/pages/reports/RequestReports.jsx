@@ -475,7 +475,7 @@ const RequestReports = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+       {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -510,9 +510,9 @@ const RequestReports = () => {
           </div>
         </div>
         
-{/* Date range indicator and filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        {/* Date range indicator and filters - IMPROVED */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
+          <div className="p-4 border-b border-gray-100 dark:border-gray-700">
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-gray-400" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -524,15 +524,15 @@ const RequestReports = () => {
                 </span>
               )}
             </div>
-            
+          </div>
+          
+          <div className="p-4">
             {/* ReportFilters Component - Make sure this component is styled properly */}
-            <div className="w-full md:w-auto">
-              <ReportFilters 
-                filters={filters}
-                onFilterChange={handleFilterChange}
-                organizations={organizations}
-              />
-            </div>
+            <ReportFilters 
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              organizations={organizations}
+            />
           </div>
         </div>
         
@@ -787,7 +787,6 @@ const RequestReports = () => {
         )}
       </div>
     </div>
-  );
+    );
 };
-
 export default RequestReports;

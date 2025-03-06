@@ -73,19 +73,19 @@ const PerformanceReports = () => {
   // Fetch response time data - MODIFIED TO USE DIRECT QUERIES
   const fetchResponseTimeData = async () => {
     try {
-      // Fetch requests with date_received and date_completed
+      // Fetch requests with date_received and completed_at
       const { data: requestsData, error: requestsError } = await supabase
         .from('v4_requests')
         .select(`
           priority,
           date_received,
-          date_completed,
+          completed_at,
           organization_id,
           v4_organizations(id, name)
         `)
         .gte('date_received', dateRange.start)
         .lte('date_received', dateRange.end)
-        .not('date_completed', 'is', null);
+        .not('completed_at', 'is', null);
       
       if (requestsError) {
         console.error('Error fetching requests data:', requestsError);
@@ -101,7 +101,7 @@ const PerformanceReports = () => {
           priorityGroups[priority] = { total: 0, count: 0 };
         }
         
-        const days = (new Date(request.date_completed) - new Date(request.date_received)) / (1000 * 60 * 60 * 24);
+        const days = (new Date(request.completed_at) - new Date(request.date_received)) / (1000 * 60 * 60 * 24);
         priorityGroups[priority].total += days;
         priorityGroups[priority].count += 1;
       });
@@ -122,7 +122,7 @@ const PerformanceReports = () => {
           orgGroups[orgId] = { name: orgName, total: 0, count: 0 };
         }
         
-        const days = (new Date(request.date_completed) - new Date(request.date_received)) / (1000 * 60 * 60 * 24);
+        const days = (new Date(request.completed_at) - new Date(request.date_received)) / (1000 * 60 * 60 * 24);
         orgGroups[orgId].total += days;
         orgGroups[orgId].count += 1;
       });

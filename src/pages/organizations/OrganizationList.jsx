@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import ModalOrganizationUsers from '../../components/modals/ModalOrganizationUsers';
 
 const OrganizationList = () => {
   const { user } = useAuth();
@@ -18,7 +19,10 @@ const OrganizationList = () => {
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
+  
+  // Modal states
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedOrgId, setSelectedOrgId] = useState(null);
 
   useEffect(() => {
     fetchOrganizations();
@@ -68,12 +72,24 @@ const OrganizationList = () => {
     }
   };
 
+  const openUserModal = (orgId = null) => {
+    setSelectedOrgId(orgId);
+    setShowUserModal(true);
+  };
+
   const filteredOrganizations = organizations.filter(org => 
     org.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      {/* Organization Users Modal */}
+      <ModalOrganizationUsers 
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        organizationId={selectedOrgId}
+      />
+      
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -83,25 +99,14 @@ const OrganizationList = () => {
             </p>
           </div>
 
-          <div className="flex space-x-4">
-            <Link 
-              to="/organizations/users"
-              className="flex items-center px-4 py-2 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300
-                     rounded-lg transition-colors hover:bg-indigo-200 dark:hover:bg-indigo-800/30"
-            >
-              <Users className="w-4 h-4 mr-2" />
-              Manage Users
-            </Link>
-
-            <button
-              onClick={() => navigate('/organizations/new')}
-              className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black
-                       rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Organization
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/organizations/new')}
+            className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black
+                     rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Organization
+          </button>
         </div>
 
         {/* Search Bar */}
@@ -161,9 +166,9 @@ const OrganizationList = () => {
                         <Users className="w-4 h-4 mr-1" />
                         <span>{org.userCount} users</span>
                       </div>
-                      {org.contact_person && (
+                      {org.phone && (
                         <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                          Contact: {org.contact_person}
+                          Phone: {org.phone}
                         </p>
                       )}
                       {org.email && (
@@ -189,18 +194,18 @@ const OrganizationList = () => {
                   </div>
                 </div>
                 <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/30 flex justify-between">
-                  <Link
-                    to={`/organizations/${org.id}`}
+                  <button
+                    onClick={() => navigate(`/organizations/${org.id}`)}
                     className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
                   >
                     View Details
-                  </Link>
-                  <Link
-                    to={`/organizations/users?org=${org.id}`}
+                  </button>
+                  <button
+                    onClick={() => openUserModal(org.id)}
                     className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
                   >
                     Manage Users
-                  </Link>
+                  </button>
                 </div>
               </div>
             ))}

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabase';
+import ReportFilters from '../../components/reports/ReportFilters';
 import ReportChart from '../../components/reports/ReportChart';
 import ReportTable from '../../components/reports/ReportTable';
 import ReportExport from '../../components/reports/ReportExport';
 import { subMonths, format, parseISO } from 'date-fns';
-import { Loader2, Clock, UserCheck, FileUp, BarChart, Filter, Calendar } from 'lucide-react';
+import { Loader2, Clock, UserCheck, FileUp, BarChart } from 'lucide-react';
 
 const PerformanceReports = () => {
   // Default to last 3 months
@@ -15,9 +16,6 @@ const PerformanceReports = () => {
   
   // Report type filter
   const [reportType, setReportType] = useState('response_time');
-  
-  // Organization filter - add this state
-  const [organizationFilter, setOrganizationFilter] = useState("all");
   
   // Report data
   const [userPerformance, setUserPerformance] = useState([]);
@@ -70,13 +68,13 @@ const PerformanceReports = () => {
     };
     
     fetchReportData();
-  }, [dateRange, reportType, organizationFilter]); // Add organizationFilter to dependency array
+  }, [dateRange, reportType]);
   
   // Fetch response time data
   const fetchResponseTimeData = async () => {
     try {
-      // Build the query
-      let query = supabase
+      // Fetch requests with date_received and completed_at
+      const { data: requestsData, error: requestsError } = await supabase
         .from('v4_requests')
         .select(`
           priority,
@@ -88,14 +86,6 @@ const PerformanceReports = () => {
         .gte('date_received', dateRange.start)
         .lte('date_received', dateRange.end)
         .not('completed_at', 'is', null);
-      
-      // Add organization filter if selected
-      if (organizationFilter !== "all") {
-        query = query.eq('sender', organizationFilter);
-      }
-      
-      // Execute query
-      const { data: requestsData, error: requestsError } = await query;
       
       if (requestsError) {
         console.error('Error fetching requests data:', requestsError);
@@ -164,26 +154,17 @@ const PerformanceReports = () => {
   // Fetch user performance data
   const fetchUserPerformanceData = async () => {
     try {
-      // Build the query
-      let query = supabase
+      // Requests processed by user
+      const { data: userData, error: userError } = await supabase
         .from('v4_requests')
         .select(`
           assigned_to,
           users!assigned_to(full_name),
-          status,
-          sender
+          status
         `)
         .gte('date_received', dateRange.start)
         .lte('date_received', dateRange.end)
         .not('assigned_to', 'is', null);
-        
-      // Add organization filter if selected
-      if (organizationFilter !== "all") {
-        query = query.eq('sender', organizationFilter);
-      }
-      
-      // Execute query
-      const { data: userData, error: userError } = await query;
         
       if (userError) {
         console.error('Error fetching user performance:', userError);
@@ -241,20 +222,12 @@ const PerformanceReports = () => {
   // Fetch volume trend data
   const fetchVolumeData = async () => {
     try {
-      // Build the query
-      let query = supabase
+      // Fetch requests grouped by date_received
+      const { data: requestsData, error: requestsError } = await supabase
         .from('v4_requests')
-        .select('date_received, sender')
+        .select('date_received')
         .gte('date_received', dateRange.start)
         .lte('date_received', dateRange.end);
-      
-      // Add organization filter if selected
-      if (organizationFilter !== "all") {
-        query = query.eq('sender', organizationFilter);
-      }
-      
-      // Execute query
-      const { data: requestsData, error: requestsError } = await query;
       
       if (requestsError) {
         console.error('Error fetching volume data:', requestsError);
@@ -342,11 +315,8 @@ const PerformanceReports = () => {
       </p>
       
       {/* Report Type Selector */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <BarChart className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Report Type</h2>
-        </div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Report Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => setReportType('response_time')}
@@ -395,89 +365,12 @@ const PerformanceReports = () => {
         </div>
       </div>
       
-      {/* Date range indicator */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Calendar className="w-5 h-5 text-gray-400" />
-          <span className="text-sm font-medium text-gray-900 dark:text-white">
-            {format(parseISO(dateRange.start), 'MMM d, yyyy')} to {format(parseISO(dateRange.end), 'MMM d, yyyy')}
-          </span>
-          {organizationFilter !== 'all' && (
-            <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 rounded-full">
-              {organizations.find(org => org.id === organizationFilter)?.name || 'Organization Filter Active'}
-            </span>
-          )}
-        </div>
-      </div>
-      
-      {/* Report Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Report Filters
-          </h2>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Organization select */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Organization
-            </label>
-            <select
-              value={organizationFilter}
-              onChange={(e) => setOrganizationFilter(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                       bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-            >
-              <option value="all">All Organizations</option>
-              {organizations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          {/* Date Range Start */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Date Range (Start)
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-              />
-            </div>
-          </div>
-          
-          {/* Date Range End */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Date Range (End)
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-900 text-gray-900 dark:text-white
-                         focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Filters */}
+      <ReportFilters 
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        organizations={organizations}
+      />
       
       {/* Report Content */}
       {loading ? (
@@ -485,11 +378,11 @@ const PerformanceReports = () => {
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-8 mt-6">
           {reportType === 'response_time' && responseTimeData && (
             <>
               {/* Response Time by Priority */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                   Average Response Time by Priority
                 </h2>
@@ -507,7 +400,7 @@ const PerformanceReports = () => {
               </div>
               
               {/* Response Time by Organization */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                   Average Response Time by Organization
                 </h2>
@@ -528,7 +421,7 @@ const PerformanceReports = () => {
           )}
           
           {reportType === 'user_performance' && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                 User Performance Metrics
               </h2>
@@ -551,7 +444,7 @@ const PerformanceReports = () => {
           )}
           
           {reportType === 'volume_trends' && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                 Request Volume by Month
               </h2>

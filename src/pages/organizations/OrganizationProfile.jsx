@@ -138,12 +138,12 @@ const OrganizationProfile = () => {
           {/* Organization Details */}
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {organization.contact_person && (
+              {organization.phone && (
                 <div className="flex items-start">
                   <User className="h-5 w-5 text-gray-400 mt-1 mr-3" />
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Contact Person</p>
-                    <p className="text-base text-gray-900 dark:text-white">{organization.contact_person}</p>
+                    <p className="text-base text-gray-900 dark:text-white">{organization.phone}</p>
                   </div>
                 </div>
               )}
@@ -158,12 +158,12 @@ const OrganizationProfile = () => {
                 </div>
               )}
               
-              {organization.phone && (
+              {organization.phone2 && (
                 <div className="flex items-start">
                   <Phone className="h-5 w-5 text-gray-400 mt-1 mr-3" />
                   <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone Number</p>
-                    <p className="text-base text-gray-900 dark:text-white">{organization.phone}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Second Contact Person</p>
+                    <p className="text-base text-gray-900 dark:text-white">{organization.phone2}</p>
                   </div>
                 </div>
               )}
@@ -194,7 +194,7 @@ const OrganizationProfile = () => {
             )}
           </div>
           
-          {/* Request Stats - with neutral colors and real data */}
+          {/* Request Stats - with original colors and real data */}
           <div className="border-t border-gray-200 dark:border-gray-700 p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Request Statistics</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -204,11 +204,11 @@ const OrganizationProfile = () => {
               </div>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending</p>
-                <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">{requestStats.pending}</p>
+                <p className="text-2xl font-bold text-yellow-500">{requestStats.pending}</p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed</p>
-                <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">{requestStats.completed}</p>
+                <p className="text-2xl font-bold text-green-500">{requestStats.completed}</p>
               </div>
             </div>
           </div>

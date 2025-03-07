@@ -25,11 +25,25 @@ export const roleBasedNavigation = {
       path: '/admindashboard',
       icon: LayoutDashboard
     },
+    
+    {
+      name: 'Organizations',
+      path: '/organizations',
+      icon: Building
+    },
+    
+    {
+      name: 'User Management',
+      path: '/user-management',
+      icon: UserCog
+    },
+    
     {
       name: 'Requests',
       path: '/requests',
       icon: FileText
     },
+    
     {
       name: 'Reports',
       path: '/reports',
@@ -52,17 +66,8 @@ export const roleBasedNavigation = {
         }
       ]
     },
-    {
-      name: 'Organizations',
-      path: '/organizations',
-      icon: Building
-    },
-    {
-      name: 'User Management',
-      path: '/user-management',
-      icon: Users
-    },
-        {
+
+      {
       name: 'Dashboards',
       path: '',
       icon: LayoutDashboard,
@@ -87,15 +92,29 @@ export const roleBasedNavigation = {
       path: '/userdashboard',
       icon: LayoutDashboard
     },
+    
     {
       name: 'Requests',
       path: '/requests',
       icon: FileText
     },
+    
     {
-      name: 'Organizations',
-      path: '/organizations',
-      icon: Building
+      name: 'Reports',
+      path: '/reports',
+      icon: BarChart,
+      children: [
+        {
+          name: 'Request Reports',
+          path: '/reports/requests',
+          icon: FileSearch
+        }
+        {
+          name: 'Organization Reports',
+          path: '/reports/organizations',
+          icon: Building
+        }
+      ]
     }
   ],
   

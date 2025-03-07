@@ -119,11 +119,9 @@ const Contact = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Main Office</p>
                   <p className="text-base text-gray-900 dark:text-white">
-                    Physical Address<br />
-                    MTN Rwanda Headquarters, KG 9 Ave, Kigali, Rwanda<br />
+                    MTN Rwanda Headquarters<br />
+                    KG 9 Ave, Kigali, Rwanda<br />
 
-                    Postal Address<br />
-                    MTN Centre, Nyarutarama P.O. Box 264. Kigali, Rwanda
                   </p>
                 </div>
               </div>

@@ -332,8 +332,8 @@ const RequestList = () => {
             {canProcessRequests() && (
               <button
                 onClick={() => setNewRequestModalOpen(true)}
-                className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                        hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
+                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 New Request

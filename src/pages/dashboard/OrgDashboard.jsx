@@ -519,49 +519,6 @@ const OrgDashboard = () => {
             )}
           </motion.div>
 
-          {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-          >
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Quick Actions
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link
-                to="/requests"
-                className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              >
-                <FileSearch className="h-6 w-6 text-blue-500 mr-3" />
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">View All Requests</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">See all your document requests</p>
-                </div>
-              </Link>
-              <Link
-                to={`/requests?status=completed`}
-                className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              >
-                <Download className="h-6 w-6 text-green-500 mr-3" />
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">Download Responses</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Get completed request files</p>
-                </div>
-              </Link>
-              <Link
-                to="/contact"
-                className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              >
-                <MessageSquare className="h-6 w-6 text-purple-500 mr-3" />
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">Contact Support</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Get help with requests</p>
-                </div>
-              </Link>
-            </div>
-          </motion.div>
 
           {/* Organization Details */}
           <motion.div

@@ -6,18 +6,16 @@ import {
   Clock, 
   CheckSquare, 
   ArrowRight,
-  Inbox,
-  Upload,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../config/supabase';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 const UserDashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
-    assignedRequests: 0,
     pendingRequests: 0,
     completedRequests: 0,
     urgentRequests: 0
@@ -33,34 +31,25 @@ const UserDashboard = () => {
     try {
       setLoading(true);
 
-      // Fetch assigned requests count
-      const { count: assignedRequests } = await supabase
-        .from('v4_requests')
-        .select('*', { count: 'exact' })
-        .eq('assigned_to', user.id);
-
-      // Fetch pending/in progress requests count
+      // Fetch pending requests count
       const { count: pendingRequests } = await supabase
         .from('v4_requests')
         .select('*', { count: 'exact' })
-        .eq('assigned_to', user.id)
-        .in('status', ['pending', 'in_progress']);
+        .eq('status', 'pending');
 
       // Fetch completed requests count
       const { count: completedRequests } = await supabase
         .from('v4_requests')
         .select('*', { count: 'exact' })
-        .eq('assigned_to', user.id)
         .eq('status', 'completed');
 
       // Fetch urgent requests count
       const { count: urgentRequests } = await supabase
         .from('v4_requests')
         .select('*', { count: 'exact' })
-        .eq('assigned_to', user.id)
         .eq('priority', 'urgent');
 
-      // Fetch recent assigned requests
+      // Fetch recent requests
       const { data: recentRequestsData } = await supabase
         .from('v4_requests')
         .select(`
@@ -72,7 +61,6 @@ const UserDashboard = () => {
           priority,
           organizations:sender (name)
         `)
-        .eq('assigned_to', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -83,7 +71,6 @@ const UserDashboard = () => {
       })) || [];
 
       setStats({
-        assignedRequests: assignedRequests || 0,
         pendingRequests: pendingRequests || 0,
         completedRequests: completedRequests || 0,
         urgentRequests: urgentRequests || 0
@@ -151,7 +138,7 @@ const UserDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {loading ? (
           <div className="flex items-center justify-center min-h-screen">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
           </div>
         ) : (
           <div className="space-y-8">
@@ -165,37 +152,16 @@ const UserDashboard = () => {
                 {getGreeting()}, {user?.full_name}
               </h1>
               <p className="mt-2 text-gray-600 dark:text-gray-400">
-                Welcome to Go Digital Edition 4. Here's your overview.
+                Welcome to Document Request Management System. Here's your overview.
               </p>
             </motion.div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-              >
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30 mr-4">
-                    <Inbox className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Assigned Requests
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {stats.assignedRequests}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
                 className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
               >
                 <div className="flex items-center">
@@ -216,7 +182,7 @@ const UserDashboard = () => {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0.2 }}
                 className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
               >
                 <div className="flex items-center">
@@ -237,7 +203,7 @@ const UserDashboard = () => {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
+                transition={{ delay: 0.3 }}
                 className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
               >
                 <div className="flex items-center">
@@ -256,16 +222,16 @@ const UserDashboard = () => {
               </motion.div>
             </div>
 
-            {/* Recent Assigned Requests */}
+            {/* Recent Requests */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+              transition={{ delay: 0.4 }}
               className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
             >
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Your Assigned Requests
+                  Recent Requests
                 </h2>
                 <Link 
                   to="/requests"
@@ -277,12 +243,12 @@ const UserDashboard = () => {
 
               {recentRequests.length === 0 ? (
                 <div className="text-center py-10 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                  <Inbox className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                   <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                    No requests assigned to you
+                    No recent requests
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    You don't have any assigned requests at this time.
+                    There are no recent requests to display.
                   </p>
                 </div>
               ) : (
@@ -319,7 +285,7 @@ const UserDashboard = () => {
                             </Link>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {format(parseISO(request.date_received), 'dd MMM yyyy')}
+                            {format(new Date(request.date_received), 'dd MMM yyyy')}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             <div className="truncate max-w-xs">
@@ -345,50 +311,6 @@ const UserDashboard = () => {
                   </table>
                 </div>
               )}
-            </motion.div>
-
-            {/* Quick Actions */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-            >
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Quick Actions
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Link
-                  to="/requests"
-                  className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <Inbox className="h-6 w-6 text-blue-500 mr-3" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">View All Requests</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">See all document requests</p>
-                  </div>
-                </Link>
-                <Link
-                  to={`/requests?status=pending`}
-                  className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <Clock className="h-6 w-6 text-yellow-500 mr-3" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Pending Requests</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">View requests awaiting action</p>
-                  </div>
-                </Link>
-                <Link
-                  to={`/requests?filter=assigned`}
-                  className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <Upload className="h-6 w-6 text-green-500 mr-3" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Upload Responses</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Upload files for requests</p>
-                  </div>
-                </Link>
-              </div>
             </motion.div>
           </div>
         )}

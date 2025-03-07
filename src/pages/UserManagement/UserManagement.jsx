@@ -511,7 +511,7 @@ const UserManagement = () => {
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              
+              User Management
             </h1>
             <div className="flex flex-wrap gap-3">
               <button

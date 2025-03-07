@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { 
   BarChart as BarChartIcon, 
   Calendar, 
-  Download, 
+  FileSpreadsheet, 
   Building,
   Loader2,
   Filter,
@@ -640,8 +640,8 @@ return (
           className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
                       hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
-          <Download className="w-4 h-4 mr-2" />
-          Export to Excel
+          <FileSpreadsheet className="w-4 h-4 mr-2" />
+          Export
         </button>
       </div>
       

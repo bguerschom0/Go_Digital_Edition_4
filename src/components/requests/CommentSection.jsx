@@ -158,20 +158,6 @@ const handleSubmit = async (e) => {
     }
   };
 
-  // Get role display name
-  const getRoleDisplayName = (role) => {
-    switch(role) {
-      case 'administrator':
-        return 'Admin';
-      case 'user':
-        return 'Staff';
-      case 'organization':
-        return 'Organization';
-      default:
-        return role;
-    }
-  };
-
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -213,11 +199,6 @@ const handleSubmit = async (e) => {
                   <div className="flex justify-between items-start gap-2 mb-1">
                     <span className="text-xs font-medium">
                       {comment.user_id === user.id ? 'You' : comment.users.full_name}
-                      {comment.users.user_role_v4 && (
-                        <span className="ml-1 opacity-70">
-                          ({getRoleDisplayName(comment.users.user_role_v4)})
-                        </span>
-                      )}
                     </span>
                     <span className="text-xs opacity-70">
                       {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}

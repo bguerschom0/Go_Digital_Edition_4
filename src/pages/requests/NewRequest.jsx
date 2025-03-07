@@ -341,9 +341,8 @@ const NewRequest = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg
-                         hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors 
-                         flex items-center gap-2 disabled:opacity-50"
+                className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
+                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 {loading ? (
                   <>

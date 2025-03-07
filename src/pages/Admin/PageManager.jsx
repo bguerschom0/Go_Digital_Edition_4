@@ -28,8 +28,8 @@ const PageManager = () => {
         
         // For demo purposes, we'll simulate executing these commands and parsing the output
         const gitCommands = [
-          'git ls-files "src/pages/**/*.jsx" "src/pages/**/*.js" "src/pages/**/*.tsx"',
-          'git log --name-only --pretty=format:"%ad" --date=short -- src/pages/'
+          'git ls-files "src/**/*.jsx" "src/**/*.js" "src/**/*.tsx"',
+          'git log --name-only --pretty=format:"%ad" --date=short -- src/'
         ];
         
         setGitOutput(`Executing Git commands:\n${gitCommands.join('\n')}\n\nAnalyzing repository structure...`);
@@ -40,7 +40,32 @@ const PageManager = () => {
         
         // Parse the files from App.js and extract actual page components
         // These are based on the imports from your uploaded App.js file
+        const routingComponents = [
+          { component: 'LoginPage', path: '/login' },
+          { component: 'UserManagement', path: '/user-management' },
+          { component: 'Unauthorized', path: '/unauthorized' },
+          { component: 'AdminDashboard', path: '/admindashboard' },
+          { component: 'UserDashboard', path: '/userdashboard' },
+          { component: 'OrgDashboard', path: '/orgdashboard' },
+          { component: 'RequestList', path: '/requests' },
+          { component: 'RequestDetail', path: '/requests/:id' },
+          { component: 'NewRequest', path: '/requests/new' },
+          { component: 'OrganizationList', path: '/organizations' },
+          { component: 'OrganizationDetail', path: '/organizations/:id' },
+          { component: 'OrganizationUsers', path: '/organizations/users' },
+          { component: 'OrganizationProfile', path: '/organization-profile' },
+          { component: 'RequestReports', path: '/reports/requests' },
+          { component: 'PerformanceReports', path: '/reports/performance' },
+          { component: 'OrganizationReports', path: '/reports/organizations' },
+          { component: 'CustomReports', path: '/reports/custom' },
+          { component: 'NotificationCenter', path: '/notifications' },
+          { component: 'Contact', path: '/contact' }
+        ];
+        
+        // Files from the entire src directory that could be React components
+        // This simulates what Git would find scanning the entire src directory
         const detectedFiles = [
+          // Pages actually in routing
           'src/pages/Login/Login.jsx',
           'src/pages/UserManagement/UserManagement.jsx',
           'src/pages/Unauthorized.jsx',
@@ -59,62 +84,102 @@ const PageManager = () => {
           'src/pages/reports/OrganizationReports.jsx',
           'src/pages/reports/CustomReports.jsx',
           'src/pages/notifications/NotificationCenter.jsx',
-          'src/pages/Contact.jsx'
+          'src/pages/Contact.jsx',
+          
+          // Components in src that aren't in pages directory
+          'src/components/dashboard/DashboardCard.jsx',
+          'src/components/forms/RequestForm.jsx',
+          'src/components/layout/Header.jsx',
+          'src/components/layout/Footer.jsx',
+          'src/components/layout/Sidebar.jsx',
+          'src/components/common/Button.jsx',
+          'src/components/common/Card.jsx',
+          'src/components/common/Modal.jsx',
+          
+          // Potential unused pages
+          'src/pages/old/OldDashboard.jsx',
+          'src/pages/beta/BetaFeatures.jsx',
+          'src/pages/archive/ArchivedRequests.jsx',
+          'src/views/LegacyView.jsx',
+          'src/screens/DeprecatedScreen.jsx',
+          
+          // Utils and hooks (not components)
+          'src/utils/api.js',
+          'src/utils/formatters.js',
+          'src/hooks/useAuth.js',
+          'src/hooks/useApi.js',
+          
+          // Context providers (could be components)
+          'src/contexts/AuthContext.jsx',
+          'src/contexts/ThemeContext.jsx',
+          
+          // Tests
+          'src/tests/components/Button.test.js',
+          'src/tests/pages/Login.test.js'
         ];
-        
-        // Let's check for extra files that might exist in the repo but aren't imported in App.js
-        // These would be detected by Git command but aren't in your routing
-        const potentialUnusedFiles = [
-          'src/pages/OldPage.jsx', // Example of unused page
-          'src/pages/legacy/LegacyDashboard.jsx', // Example of legacy page
-          'src/pages/testing/TestComponent.jsx' // Example of test page
-        ];
-        
-        // Combine the lists to simulate what Git would find
-        const allFiles = [...detectedFiles];
         
         // Analyze the files to create page objects
-        const pageObjects = allFiles.map(filePath => {
-          // Extract component name from file path
-          const pathParts = filePath.split('/');
-          const fileName = pathParts[pathParts.length - 1];
-          const componentName = fileName.replace('.jsx', '').replace('.js', '').replace('.tsx', '');
-          
-          // Determine if the file is being used in routing (from your App.js)
-          const isInRouting = detectedFiles.includes(filePath);
-          
-          // Generate path based on file location and naming convention
-          let routePath = '/' + componentName.toLowerCase();
-          if (pathParts.length > 3) {
-            // If in subfolder, use that as part of the path
-            const section = pathParts[pathParts.length - 2];
-            if (section !== 'pages') {
-              routePath = '/' + section.toLowerCase() + routePath;
+        const pageObjects = detectedFiles
+          // Filter to only include JSX files that could be components
+          .filter(filePath => 
+            (filePath.endsWith('.jsx') || filePath.endsWith('.tsx')) && 
+            !filePath.includes('.test.') && 
+            !filePath.includes('.spec.')
+          )
+          .map(filePath => {
+            // Extract component name from file path
+            const pathParts = filePath.split('/');
+            const fileName = pathParts[pathParts.length - 1];
+            const componentName = fileName.replace('.jsx', '').replace('.js', '').replace('.tsx', '');
+            
+            // Check if it's a component used in routing
+            const routeInfo = routingComponents.find(r => 
+              r.component === componentName || 
+              `${componentName}Page` === r.component
+            );
+            
+            // Determine if this could be a page component
+            const isPageComponent = filePath.includes('/pages/') || 
+                                 filePath.includes('/views/') || 
+                                 filePath.includes('/screens/');
+            
+            // If it's in routing, use that path, otherwise generate one
+            const routePath = routeInfo ? 
+              routeInfo.path : 
+              isPageComponent ? `/${componentName.toLowerCase()}` : null;
+            
+            // Check last modified date (would come from Git in real implementation)
+            // For this demo, we'll use static dates
+            const lastModified = routeInfo ? 
+              '2024-02-15' : // Recently modified for pages in routing
+              '2023-06-30';  // Older date for unused pages
+            
+            // Different recommendation categories
+            let recommended = 'keep';
+            let reason = 'Used in application';
+            
+            if (isPageComponent && !routeInfo) {
+              // It's in a pages directory but not in routing
+              recommended = 'delete';
+              reason = 'Page component not found in routing configuration';
+            } else if (!isPageComponent) {
+              // It's a component but not in a pages directory
+              recommended = 'review';
+              reason = 'UI component, not a page';
             }
-          }
-          
-          // Special case handling for index files
-          if (componentName === 'index') {
-            routePath = '/' + pathParts[pathParts.length - 2].toLowerCase();
-          }
-          
-          // Determine last modified date (would come from Git in real implementation)
-          // For this demo, we'll use static dates
-          const lastModified = isInRouting ? 
-            '2024-02-15' : // Recently modified for pages in routing
-            '2023-06-30';  // Older date for unused pages
-          
-          return {
-            id: filePath,
-            path: routePath,
-            component: componentName,
-            filePath: filePath,
-            lastModified: lastModified,
-            inRouting: isInRouting,
-            recommended: isInRouting ? 'keep' : 'delete',
-            reason: isInRouting ? 'Used in App.js routing' : 'Not found in routing configuration'
-          };
-        });
+            
+            return {
+              id: filePath,
+              path: routePath,
+              component: componentName,
+              filePath: filePath,
+              lastModified: lastModified,
+              inRouting: !!routeInfo,
+              isPage: isPageComponent,
+              recommended: recommended,
+              reason: reason
+            };
+          });
         
         setPages(pageObjects);
         setLoading(false);
@@ -184,7 +249,7 @@ const PageManager = () => {
     }
     
     // Search filter
-    if (searchTerm && !page.path.toLowerCase().includes(searchTerm.toLowerCase()) && 
+    if (searchTerm && !page.path?.toLowerCase().includes(searchTerm.toLowerCase()) && 
         !page.component.toLowerCase().includes(searchTerm.toLowerCase()) &&
         !page.filePath.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
@@ -199,7 +264,11 @@ const PageManager = () => {
     
     switch(sortBy) {
       case 'path':
-        comparison = a.path.localeCompare(b.path);
+        // Handle null paths (components that aren't pages)
+        if (!a.path && !b.path) comparison = 0;
+        else if (!a.path) comparison = 1;
+        else if (!b.path) comparison = -1;
+        else comparison = a.path.localeCompare(b.path);
         break;
       case 'component':
         comparison = a.component.localeCompare(b.component);
@@ -221,7 +290,8 @@ const PageManager = () => {
   const pageCounts = {
     total: pages.length,
     keep: pages.filter(page => page.recommended === 'keep').length,
-    delete: pages.filter(page => page.recommended === 'delete').length
+    delete: pages.filter(page => page.recommended === 'delete').length,
+    review: pages.filter(page => page.recommended === 'review').length
   };
 
   if (loading) {
@@ -229,7 +299,7 @@ const PageManager = () => {
       <div className="max-w-6xl mx-auto p-4">
         <div className="flex flex-col items-center justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          <p className="mt-4 text-lg">Scanning repository structure...</p>
+          <p className="mt-4 text-lg">Scanning full src directory...</p>
           {gitOutput && (
             <div className="mt-6 bg-gray-800 text-green-400 p-4 rounded font-mono text-sm w-full max-w-lg overflow-auto">
               <pre>{gitOutput}</pre>
@@ -260,22 +330,29 @@ const PageManager = () => {
     <div className="max-w-6xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-2">Page Manager</h1>
       <p className="text-gray-600 mb-6">
-        Git repository analysis complete. Found {pages.length} page components in your codebase.
+        Repository analysis complete. Found {pages.length} potential components in your src directory.
       </p>
       
       {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-2">Total Pages</h2>
+          <h2 className="text-lg font-semibold mb-2">Total Components</h2>
           <p className="text-3xl font-bold">{pageCounts.total}</p>
         </div>
         <div className="bg-green-50 p-4 rounded shadow border-l-4 border-green-500">
-          <h2 className="text-lg font-semibold mb-2">In Routing (Keep)</h2>
+          <h2 className="text-lg font-semibold mb-2">Keep</h2>
           <p className="text-3xl font-bold text-green-600">{pageCounts.keep}</p>
+          <p className="text-xs text-green-700 mt-1">Used in routing</p>
         </div>
         <div className="bg-red-50 p-4 rounded shadow border-l-4 border-red-500">
-          <h2 className="text-lg font-semibold mb-2">Not Used (Delete)</h2>
+          <h2 className="text-lg font-semibold mb-2">Delete</h2>
           <p className="text-3xl font-bold text-red-600">{pageCounts.delete}</p>
+          <p className="text-xs text-red-700 mt-1">Unused page components</p>
+        </div>
+        <div className="bg-yellow-50 p-4 rounded shadow border-l-4 border-yellow-500">
+          <h2 className="text-lg font-semibold mb-2">Review</h2>
+          <p className="text-3xl font-bold text-yellow-600">{pageCounts.review}</p>
+          <p className="text-xs text-yellow-700 mt-1">UI components, not pages</p>
         </div>
       </div>
       
@@ -312,9 +389,10 @@ const PageManager = () => {
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
               >
-                <option value="all">All Pages</option>
-                <option value="keep">Used in Routing (Keep)</option>
-                <option value="delete">Not Used (Delete)</option>
+                <option value="all">All Components</option>
+                <option value="keep">Keep (In Routing)</option>
+                <option value="delete">Delete (Unused Pages)</option>
+                <option value="review">Review (UI Components)</option>
               </select>
             </div>
             
@@ -326,7 +404,7 @@ const PageManager = () => {
                 id="searchTerm"
                 type="text"
                 className="border rounded p-2 w-full"
-                placeholder="Search pages..."
+                placeholder="Search components..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -338,7 +416,7 @@ const PageManager = () => {
               className={`w-full md:w-auto px-4 py-2 rounded ${deleteMode ? 'bg-gray-500 text-white' : 'bg-red-500 text-white'}`}
               onClick={() => setDeleteMode(!deleteMode)}
             >
-              {deleteMode ? 'Cancel' : 'Select Pages to Delete'}
+              {deleteMode ? 'Cancel' : 'Select Files to Delete'}
             </button>
             
             {deleteMode && (
@@ -406,7 +484,7 @@ const PageManager = () => {
                   </div>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                  Recommendation
                 </th>
               </tr>
             </thead>
@@ -423,6 +501,7 @@ const PageManager = () => {
                         checked={pagesToDelete.includes(page.id)}
                         onChange={() => togglePageForDeletion(page.id)}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        disabled={page.recommended === 'keep'}
                       />
                     </td>
                   )}
@@ -430,7 +509,7 @@ const PageManager = () => {
                     <div className="text-sm font-medium text-gray-900">{page.component}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{page.path}</div>
+                    <div className="text-sm text-gray-500">{page.path || '—'}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">{page.filePath}</div>
@@ -441,9 +520,10 @@ const PageManager = () => {
                   <td className="px-4 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       page.recommended === 'keep' ? 'bg-green-100 text-green-800' : 
-                      'bg-red-100 text-red-800'
+                      page.recommended === 'delete' ? 'bg-red-100 text-red-800' : 
+                      'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {page.inRouting ? 'In Routing' : 'Not Used'}
+                      {page.recommended}
                     </span>
                     <div className="text-xs text-gray-500 mt-1">{page.reason}</div>
                   </td>
@@ -454,21 +534,21 @@ const PageManager = () => {
         </div>
       ) : (
         <div className="text-center py-8 bg-gray-50 rounded shadow">
-          <p className="text-gray-600">No pages match your filter criteria</p>
+          <p className="text-gray-600">No components match your filter criteria</p>
         </div>
       )}
 
       {/* Implementation notes */}
-      <div className="mt-6 bg-yellow-50 p-4 rounded shadow border-l-4 border-yellow-500">
-        <h3 className="text-lg font-semibold text-yellow-800 mb-2">Implementation Notes</h3>
-        <p className="text-sm text-yellow-700 mb-2">
-          To fully implement this Page Manager with your Git repository:
+      <div className="mt-6 bg-blue-50 p-4 rounded shadow border-l-4 border-blue-500">
+        <h3 className="text-lg font-semibold text-blue-800 mb-2">Implementation Guide</h3>
+        <p className="text-sm text-blue-700 mb-2">
+          This component can be integrated with your actual Git repository using a backend API that:
         </p>
-        <ol className="list-decimal pl-5 text-sm text-yellow-700">
-          <li className="mb-1">This component can be run as a local tool or as part of your admin interface</li>
-          <li className="mb-1">For full Git integration, you'll need a Node.js backend service with access to your Git repository</li>
-          <li className="mb-1">The backend would execute Git commands and parse the results</li>
-          <li className="mb-1">The React component would communicate with this backend via API calls</li>
+        <ol className="list-decimal pl-5 text-sm text-blue-700">
+          <li className="mb-1">Scans your entire src directory for React components</li>
+          <li className="mb-1">Cross-references the files with your App.js routing</li>
+          <li className="mb-1">Uses Git history to determine last modified dates</li>
+          <li className="mb-1">Provides an API endpoint for executing Git delete commands</li>
         </ol>
       </div>
 
@@ -478,7 +558,7 @@ const PageManager = () => {
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Confirm Deletion</h2>
             <p className="mb-4">
-              Are you sure you want to delete these {pagesToDelete.length} pages from your repository?
+              Are you sure you want to delete these {pagesToDelete.length} files from your repository?
             </p>
             <div className="max-h-40 overflow-y-auto mb-4 border rounded p-2">
               <ul className="list-disc pl-5">

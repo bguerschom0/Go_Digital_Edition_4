@@ -151,6 +151,7 @@ const OrganizationList = () => {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Organization Management
             </h1>
           </div>
 

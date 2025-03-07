@@ -520,68 +520,7 @@ const OrgDashboard = () => {
           </motion.div>
 
 
-          {/* Organization Details */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-          >
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-              <Building className="h-5 w-5 mr-2" />
-              Organization Information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                  Organization Name
-                </p>
-                <p className="text-base text-gray-900 dark:text-white">
-                  {orgDetails.name}
-                </p>
-              </div>
-              {orgDetails.contact_person && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                    Contact Person
-                  </p>
-                  <p className="text-base text-gray-900 dark:text-white">
-                    {orgDetails.contact_person}
-                  </p>
-                </div>
-              )}
-              {orgDetails.email && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                    Email
-                  </p>
-                  <p className="text-base text-gray-900 dark:text-white">
-                    {orgDetails.email}
-                  </p>
-                </div>
-              )}
-              {orgDetails.phone && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                    Phone
-                  </p>
-                  <p className="text-base text-gray-900 dark:text-white">
-                    {orgDetails.phone}
-                  </p>
-                </div>
-              )}
-              {orgDetails.address && (
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                    Address
-                  </p>
-                  <p className="text-base text-gray-900 dark:text-white">
-                    {orgDetails.address}
-                  </p>
-                </div>
-              )}
-            </div>
-          </motion.div>
+        
         </div>
       </div>
     </div>

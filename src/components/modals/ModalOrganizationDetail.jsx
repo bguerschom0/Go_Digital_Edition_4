@@ -276,7 +276,7 @@ const ModalOrganizationDetail = ({ isOpen, onClose, organizationId, onSuccess })
                     Phone
                   </label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                    <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                     <input
                       type="text"
                       name="phone"
@@ -294,7 +294,7 @@ const ModalOrganizationDetail = ({ isOpen, onClose, organizationId, onSuccess })
                     Phone 2
                   </label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                    <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                     <input
                       type="text"
                       name="phone2"
@@ -314,7 +314,7 @@ const ModalOrganizationDetail = ({ isOpen, onClose, organizationId, onSuccess })
                   Email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                  <Mail className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                   <input
                     type="email"
                     name="email"
@@ -333,7 +333,7 @@ const ModalOrganizationDetail = ({ isOpen, onClose, organizationId, onSuccess })
                   Address
                 </label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-3 text-gray-400 dark:text-gray-500" />
+                  <MapPin className="absolute right-3 top-3 text-gray-400 dark:text-gray-500" />
                   <textarea
                     name="address"
                     value={formData.address || ''}

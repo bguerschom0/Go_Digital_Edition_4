@@ -334,9 +334,12 @@ const PerformanceReports = () => {
   
   return (
     <div className="container mx-auto px-4 py-8">
+
+      <div>
       <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
         Performance Report
       </h1>
+      </div>
 
       <div className="flex space-x-3">
                 {/* Export Button */}

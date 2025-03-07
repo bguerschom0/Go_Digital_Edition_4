@@ -32,7 +32,8 @@
     "tesseract.js": "^4.1.1",
     "pdf-lib": "^1.17.1",
     "date-fns": "^2.30.0",
-    "react-datepicker": "^4.25.0"
+    "react-datepicker": "^4.25.0",
+    "html2pdf.js": "^0.10.3"
     
   },
   "devDependencies": {

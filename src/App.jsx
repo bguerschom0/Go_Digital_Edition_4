@@ -95,7 +95,7 @@ const App = () => {
       <Route path="/organizations" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationList /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/organizations/users" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationUsers /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/organizations/:id" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationDetail /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/organization-profile" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationProfile /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/organization-profile" element={<ProtectedRoute requiredRoles={['administrator','organization']}><AuthenticatedLayout><OrganizationProfile /></AuthenticatedLayout></ProtectedRoute>} />
       
       {/* Report routes - only for administrators */}
       <Route path="/reports/requests" element={<ProtectedRoute requiredRoles={['administrator', 'user']}><AuthenticatedLayout><RequestReports /></AuthenticatedLayout></ProtectedRoute>} />

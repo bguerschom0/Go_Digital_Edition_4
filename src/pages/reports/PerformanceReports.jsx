@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabase';
 import ReportChart from '../../components/reports/ReportChart';
 import ReportTable from '../../components/reports/ReportTable';
-import ReportExport from '../../components/reports/ReportExport';
 import { subMonths, format, parseISO } from 'date-fns';
 import { Loader2, Clock, UserCheck, FileUp, BarChart, Filter, Calendar } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 
 const PerformanceReports = () => {
   // Default to last 3 months
@@ -16,7 +16,7 @@ const PerformanceReports = () => {
   // Report type filter
   const [reportType, setReportType] = useState('response_time');
   
-  // Organization filter - add this state
+  // Organization filter
   const [organizationFilter, setOrganizationFilter] = useState("all");
   
   // Report data
@@ -70,7 +70,34 @@ const PerformanceReports = () => {
     };
     
     fetchReportData();
-  }, [dateRange, reportType, organizationFilter]); // Add organizationFilter to dependency array
+  }, [dateRange, reportType, organizationFilter]);
+  
+  // PDF Export functionality
+  const handleExportPDF = () => {
+    // Get the report content container
+    const reportElement = document.getElementById('report-content');
+    
+    if (!reportElement) {
+      console.error('Could not find report content element');
+      return;
+    }
+    
+    // Configure the PDF options
+    const options = {
+      margin: 10,
+      filename: `${getReportTitle()}_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    // Create and download the PDF
+    html2pdf()
+      .set(options)
+      .from(reportElement)
+      .save()
+      .catch(err => console.error('Error generating PDF:', err));
+  };
   
   // Fetch response time data
   const fetchResponseTimeData = async () => {
@@ -293,31 +320,6 @@ const PerformanceReports = () => {
     }
   };
   
-  // Export report data
-  const handleExport = (format) => {
-    let exportData;
-    
-    switch (reportType) {
-      case 'response_time':
-        exportData = {
-          priorityData: responseTimeData.priorityData,
-          orgData: responseTimeData.orgData
-        };
-        break;
-      case 'user_performance':
-        exportData = userPerformance;
-        break;
-      case 'volume_trends':
-        exportData = volumeData;
-        break;
-      default:
-        exportData = {};
-    }
-    
-    // Pass the data to ReportExport component which should handle the export logic
-    console.log(`Exporting ${reportType} data in ${format} format`);
-  };
-  
   // Report title based on type
   const getReportTitle = () => {
     switch (reportType) {
@@ -334,27 +336,22 @@ const PerformanceReports = () => {
   
   return (
     <div className="container mx-auto px-4 py-8">
-
-      <div>
-      <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
-        Performance Report
-      </h1>
+      {/* Header with title and export button */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Performance Report
+        </h1>
+        
+        {/* Export Button - Positioned on the right */}
+        <button
+          onClick={handleExportPDF}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 
+                    text-white rounded-lg transition-colors"
+        >
+          <FileUp className="h-4 w-4" />
+          <span>Export PDF</span>
+        </button>
       </div>
-
-      <div className="flex space-x-3">
-                {/* Export Button */}
-            <ReportExport 
-              onExport={handleExport} 
-              data={{
-                reportType,
-                responseTimeData,
-                userPerformance,
-                volumeData
-              }}
-              filename={`performance_report_${format(new Date(), 'yyyy-MM-dd')}`}
-            />
-          </div>
-
       
       {/* Report Type Selector */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
@@ -494,13 +491,13 @@ const PerformanceReports = () => {
         </div>
       </div>
       
-      {/* Report Content */}
+      {/* Report Content with ID for PDF export */}
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
       ) : (
-        <div className="space-y-8">
+        <div id="report-content" className="space-y-8">
           {reportType === 'response_time' && responseTimeData && (
             <>
               {/* Response Time by Priority */}
@@ -583,8 +580,6 @@ const PerformanceReports = () => {
               </div>
             </div>
           )}
-          
-
         </div>
       )}
     </div>

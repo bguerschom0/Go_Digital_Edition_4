@@ -65,25 +65,8 @@ export const roleBasedNavigation = {
           icon: Building
         }
       ]
-    },
-
-      {
-      name: 'Dashboards',
-      path: '',
-      icon: LayoutDashboard,
-      children: [
-        {
-          name: 'Organization Dashboard',
-          path: '/orgdashboard',
-          icon: LayoutDashboard
-        },
-        {
-          name: 'User Dashboard',
-          path: '/userdashboard',
-          icon: LayoutDashboard
-        }
-      ]
     }
+
   ],
   
   user: [

@@ -52,7 +52,7 @@ const Contact = () => {
       name: 'Bigirimana Guerschom',
       title: 'Security and Safety Technical Operations Officer',
       email: 'guerschom.bigirimana@mtn.com',
-      phone: '+250 78831 5218',
+      phone: '+250 788 315 218',
       office: 'Security & Safety'
 
     },
@@ -60,7 +60,7 @@ const Contact = () => {
       name: 'Isimbi Esther',
       title: 'Security and Safety Officer',
       email: 'esther.isimbi@mtn.com',
-      phone: '+250 78831 7452',
+      phone: '+250 788 317 452',
       office: 'Security & Safety'
 
     },
@@ -68,7 +68,7 @@ const Contact = () => {
       name: 'Niragire Theogene',
       title: 'Security & Safety Manager',
       email: 'theogene.niragire@mtn.com',
-      phone: '+250 78831 2914',
+      phone: '+250 788 312 914',
       office: 'Security & Safety'
 
     },
@@ -76,7 +76,7 @@ const Contact = () => {
       name: 'Nkomati Modeste',
       title: 'Security and Safety Officer',
       email: 'modeste.nkomati@mtn.com',
-      phone: '+250 78831 3047',
+      phone: '+250 788 313 047',
       office: 'Security & Safety'
 
     },
@@ -84,7 +84,7 @@ const Contact = () => {
       name: 'Tuyisenge Candide',
       title: 'Security and Safety Digital Support Officer',
       email: 'candide.tuyisenge@mtn.com',
-      phone: '+250 78831 7504',
+      phone: '+250 788 317 504',
       office: 'Security & Safety'
 
     }

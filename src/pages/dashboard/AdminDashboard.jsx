@@ -247,7 +247,7 @@ const AdminDashboard = () => {
                 {getGreeting()}, {user?.full_name}
               </h1>
               <p className="mt-2 text-gray-600 dark:text-gray-400">
-                Welcome to Go Gigital Edition 4. Here's your overview.
+                Welcome to Go Digital Edition 4. Here's your overview.
               </p>
             </motion.div>
 

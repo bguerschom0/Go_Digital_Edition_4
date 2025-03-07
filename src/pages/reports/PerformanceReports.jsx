@@ -3,7 +3,7 @@ import { supabase } from '../../config/supabase';
 import ReportChart from '../../components/reports/ReportChart';
 import ReportTable from '../../components/reports/ReportTable';
 import { subMonths, format, parseISO } from 'date-fns';
-import { Loader2, Clock, UserCheck, FileUp, BarChart, Filter, Calendar } from 'lucide-react';
+import { Loader2, Clock, UserCheck, FileUp, BarChart, Filter, Calendar,FileSpreadsheet } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 
 const PerformanceReports = () => {
@@ -345,11 +345,11 @@ const PerformanceReports = () => {
         {/* Export Button - Positioned on the right */}
         <button
           onClick={handleExportPDF}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 
-                    text-white rounded-lg transition-colors"
+          className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
+                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
-          <FileUp className="h-4 w-4" />
-          <span>Export PDF</span>
+          <FileSpreadsheet className="w-4 h-4 mr-2" />
+          Export PDF
         </button>
       </div>
       

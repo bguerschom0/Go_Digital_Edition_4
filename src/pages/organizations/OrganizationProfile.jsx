@@ -7,6 +7,11 @@ import { format } from 'date-fns';
 const OrganizationProfile = () => {
   const { user } = useAuth();
   const [organization, setOrganization] = useState(null);
+  const [requestStats, setRequestStats] = useState({
+    total: 0,
+    pending: 0,
+    completed: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -41,6 +46,35 @@ const OrganizationProfile = () => {
         if (orgError) throw orgError;
         
         setOrganization(orgData);
+        
+        // Fetch request statistics
+        const [totalRequests, pendingRequests, completedRequests] = await Promise.all([
+          // Total requests count
+          supabase
+            .from('v4_requests')
+            .select('id', { count: 'exact', head: true })
+            .eq('sender', orgData.id),
+            
+          // Pending requests count (includes 'pending' and 'in_progress')
+          supabase
+            .from('v4_requests')
+            .select('id', { count: 'exact', head: true })
+            .eq('sender', orgData.id)
+            .in('status', ['pending', 'in_progress']),
+            
+          // Completed requests count
+          supabase
+            .from('v4_requests')
+            .select('id', { count: 'exact', head: true })
+            .eq('sender', orgData.id)
+            .eq('status', 'completed')
+        ]);
+        
+        setRequestStats({
+          total: totalRequests.count || 0,
+          pending: pendingRequests.count || 0,
+          completed: completedRequests.count || 0
+        });
       } catch (error) {
         console.error('Error fetching organization:', error);
         setError('Failed to load organization information');
@@ -84,18 +118,18 @@ const OrganizationProfile = () => {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Organization Profile</h1>
         
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-          {/* Organization Header */}
-          <div className="p-6 bg-blue-500 dark:bg-blue-600">
+          {/* Organization Header - Now using neutral colors */}
+          <div className="p-6 bg-gray-100 dark:bg-gray-700">
             <div className="flex justify-between items-center">
               <div className="flex items-center">
                 <div className="bg-white dark:bg-gray-800 rounded-full p-3">
-                  <Building className="h-8 w-8 text-blue-500" />
+                  <Building className="h-8 w-8 text-gray-500 dark:text-gray-400" />
                 </div>
-                <h2 className="text-xl font-bold text-white ml-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white ml-4">
                   {organization.name}
                 </h2>
               </div>
-              <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+              <div className="px-3 py-1 bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200 rounded-full text-sm font-medium">
                 Active
               </div>
             </div>
@@ -160,21 +194,21 @@ const OrganizationProfile = () => {
             )}
           </div>
           
-          {/* Request Stats */}
+          {/* Request Stats - with neutral colors and real data */}
           <div className="border-t border-gray-200 dark:border-gray-700 p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Request Statistics</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Requests</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">--</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{requestStats.total}</p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending</p>
-                <p className="text-2xl font-bold text-yellow-500">--</p>
+                <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">{requestStats.pending}</p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed</p>
-                <p className="text-2xl font-bold text-green-500">--</p>
+                <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">{requestStats.completed}</p>
               </div>
             </div>
           </div>

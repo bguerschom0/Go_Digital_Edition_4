@@ -287,7 +287,7 @@ const OrgDashboard = () => {
                   {getGreeting()}, {user?.full_name}
                 </h1>
                 <p className="mt-2 text-gray-600 dark:text-gray-400">
-                  Welcome to the Document Request System
+                  Welcome to Go Digital Edition 4. Here's your overview.
                 </p>
               </div>
               <div className="flex items-center px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">

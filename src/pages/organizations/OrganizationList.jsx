@@ -8,9 +8,9 @@ import {
   Trash, 
   Users,
   Loader2,
-  Download // Added Download icon
+  FileSpreadsheet
 } from 'lucide-react';
-import * as XLSX from 'xlsx'; // Import xlsx library for Excel export
+import * as XLSX from 'xlsx';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ModalOrganizationUsers from '../../components/modals/ModalOrganizationUsers';
@@ -162,8 +162,8 @@ const OrganizationList = () => {
                      rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
               disabled={loading || organizations.length === 0}
             >
-              <Download className="w-4 h-4 mr-2" />
-              Export Excel
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export
             </button>
 
             {/* Add organization button */}

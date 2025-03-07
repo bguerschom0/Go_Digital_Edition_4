@@ -158,8 +158,8 @@ const OrganizationList = () => {
             {/* Export to Excel button */}
             <button
               onClick={exportToExcel}
-              className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black
-                     rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
+              className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
+                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               disabled={loading || organizations.length === 0}
             >
               <FileSpreadsheet className="w-4 h-4 mr-2" />
@@ -169,8 +169,8 @@ const OrganizationList = () => {
             {/* Add organization button */}
             <button
               onClick={() => openDetailModal('new')}
-              className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black
-                     rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
+              className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
+                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Organization

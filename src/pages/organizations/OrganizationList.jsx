@@ -114,10 +114,8 @@ const OrganizationList = () => {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Organizations</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Manage organizations and their users
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            </h1>
           </div>
 
           <button
@@ -133,7 +131,7 @@ const OrganizationList = () => {
         {/* Search Bar */}
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
               placeholder="Search organizations..."

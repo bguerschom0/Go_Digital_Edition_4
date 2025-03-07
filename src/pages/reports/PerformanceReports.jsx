@@ -362,11 +362,12 @@ const PerformanceReports = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => setReportType('response_time')}
-            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors ${
-              reportType === 'response_time' 
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
-                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
-            }`}
+            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors
+              border-gray-200 dark:border-gray-700 
+              hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300
+              text-gray-700 dark:text-gray-300
+              ${reportType === 'response_time' ? 'ring-2 ring-gray-200 dark:ring-gray-600' : ''}
+            `}
           >
             <Clock className="h-5 w-5" />
             <div className="text-left">
@@ -377,11 +378,12 @@ const PerformanceReports = () => {
           
           <button
             onClick={() => setReportType('user_performance')}
-            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors ${
-              reportType === 'user_performance' 
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
-                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
-            }`}
+            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors
+              border-gray-200 dark:border-gray-700 
+              hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300
+              text-gray-700 dark:text-gray-300
+              ${reportType === 'user_performance' ? 'ring-2 ring-gray-200 dark:ring-gray-600' : ''}
+            `}
           >
             <UserCheck className="h-5 w-5" />
             <div className="text-left">
@@ -392,11 +394,12 @@ const PerformanceReports = () => {
           
           <button
             onClick={() => setReportType('volume_trends')}
-            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors ${
-              reportType === 'volume_trends' 
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
-                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
-            }`}
+            className={`p-4 rounded-lg border flex items-center gap-3 transition-colors
+              border-gray-200 dark:border-gray-700 
+              hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300
+              text-gray-700 dark:text-gray-300
+              ${reportType === 'volume_trends' ? 'ring-2 ring-gray-200 dark:ring-gray-600' : ''}
+            `}
           >
             <BarChart className="h-5 w-5" />
             <div className="text-left">

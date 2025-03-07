@@ -393,10 +393,12 @@ const ModalOrganizationDetail = ({ isOpen, onClose, organizationId, onSuccess })
             >
               Cancel
             </button>
+
+            <div className="pl-6">
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center pl-20 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
+              className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
                       hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               {saving ? (
@@ -411,6 +413,7 @@ const ModalOrganizationDetail = ({ isOpen, onClose, organizationId, onSuccess })
                 </>
               )}
             </button>
+              </div>
           </div>
         </form>
       )}

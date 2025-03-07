@@ -337,9 +337,21 @@ const PerformanceReports = () => {
       <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
         {getReportTitle()}
       </h1>
-      <p className="text-gray-600 dark:text-gray-400 mb-6">
-        Analyze performance metrics and identify trends
-      </p>
+
+                {/* Export Button */}
+          <div className="flex justify-end mt-6">
+            <ReportExport 
+              onExport={handleExport} 
+              data={{
+                reportType,
+                responseTimeData,
+                userPerformance,
+                volumeData
+              }}
+              filename={`performance_report_${format(new Date(), 'yyyy-MM-dd')}`}
+            />
+          </div>
+
       
       {/* Report Type Selector */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
@@ -569,19 +581,7 @@ const PerformanceReports = () => {
             </div>
           )}
           
-          {/* Export Button */}
-          <div className="flex justify-end mt-6">
-            <ReportExport 
-              onExport={handleExport} 
-              data={{
-                reportType,
-                responseTimeData,
-                userPerformance,
-                volumeData
-              }}
-              filename={`performance_report_${format(new Date(), 'yyyy-MM-dd')}`}
-            />
-          </div>
+
         </div>
       )}
     </div>

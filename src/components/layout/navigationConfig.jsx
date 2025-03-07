@@ -108,7 +108,7 @@ export const roleBasedNavigation = {
           name: 'Request Reports',
           path: '/reports/requests',
           icon: FileSearch
-        }
+        },
         {
           name: 'Organization Reports',
           path: '/reports/organizations',

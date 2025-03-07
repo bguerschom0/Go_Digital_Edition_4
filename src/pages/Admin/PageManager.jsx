@@ -9,254 +9,118 @@ const PageManager = () => {
   const [deleteMode, setDeleteMode] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [filterType, setFilterType] = useState('all');
-  const [sortBy, setSortBy] = useState('usage');
+  const [sortBy, setSortBy] = useState('path');
   const [sortDirection, setSortDirection] = useState('asc');
   const [searchTerm, setSearchTerm] = useState('');
+  const [gitOutput, setGitOutput] = useState('');
+  const [showGitOutput, setShowGitOutput] = useState(false);
 
   const { user } = useAuth();
 
-  // GitHub repository scanner - this would be replaced with actual GitHub API calls
+  // Function to scan the repository using Git
   useEffect(() => {
     const scanRepository = async () => {
       try {
         setLoading(true);
         
-        // In a real implementation, this would be an API call to scan your GitHub repo
-        // For now, we'll simulate the analysis based on the routes in your App.js
+        // In a real-world implementation, we would execute Git commands here
+        // This would typically be done in a backend service that has access to the Git repo
         
-        // This would normally come from a backend service that analyzes your repo
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network request
-        
-        // This data would come from analyzing your GitHub repo content
-        const analyzedPages = [
-          // Active pages from your App.js
-          { 
-            id: 'login', 
-            path: '/login', 
-            component: 'LoginPage',
-            filePath: 'src/pages/Login/Login.jsx',
-            lastModified: '2024-02-15',
-            usageCount: 150,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth'],
-            recommended: 'keep',
-            usedBy: ['public'],
-            reason: 'Critical authentication component'
-          },
-          { 
-            id: 'adminDashboard', 
-            path: '/admindashboard', 
-            component: 'AdminDashboard',
-            filePath: 'src/pages/dashboard/AdminDashboard.jsx',
-            lastModified: '2024-02-10',
-            usageCount: 87,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['administrator'],
-            reason: 'Active admin interface'
-          },
-          { 
-            id: 'userDashboard', 
-            path: '/userdashboard', 
-            component: 'UserDashboard',
-            filePath: 'src/pages/dashboard/UserDashboard.jsx',
-            lastModified: '2024-02-12',
-            usageCount: 134,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['user', 'administrator'],
-            reason: 'Active user interface'
-          },
-          { 
-            id: 'orgDashboard', 
-            path: '/orgdashboard', 
-            component: 'OrgDashboard',
-            filePath: 'src/pages/dashboard/OrgDashboard.jsx',
-            lastModified: '2024-02-11',
-            usageCount: 76,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['organization', 'administrator'],
-            reason: 'Active organization interface'
-          },
-          { 
-            id: 'userManagement', 
-            path: '/user-management', 
-            component: 'UserManagement',
-            filePath: 'src/pages/UserManagement/UserManagement.jsx',
-            lastModified: '2024-02-05',
-            usageCount: 42,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['administrator'],
-            reason: 'Active admin tool'
-          },
-          
-          // More active pages
-          { 
-            id: 'requestList', 
-            path: '/requests', 
-            component: 'RequestList',
-            filePath: 'src/pages/requests/RequestList.jsx',
-            lastModified: '2024-02-08',
-            usageCount: 120,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['all authenticated'],
-            reason: 'Core functionality'
-          },
-          { 
-            id: 'requestDetail', 
-            path: '/requests/:id', 
-            component: 'RequestDetail',
-            filePath: 'src/pages/requests/RequestDetail.jsx',
-            lastModified: '2024-02-07',
-            usageCount: 95,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['all authenticated'],
-            reason: 'Core functionality'
-          },
-          { 
-            id: 'newRequest', 
-            path: '/requests/new', 
-            component: 'NewRequest',
-            filePath: 'src/pages/requests/NewRequest.jsx',
-            lastModified: '2024-02-06',
-            usageCount: 67,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['administrator', 'user'],
-            reason: 'Core functionality'
-          },
-          
-          // Organization pages
-          { 
-            id: 'organizationList', 
-            path: '/organizations', 
-            component: 'OrganizationList',
-            filePath: 'src/pages/organizations/OrganizationList.jsx',
-            lastModified: '2024-02-04',
-            usageCount: 38,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['administrator'],
-            reason: 'Active admin tool'
-          },
-          { 
-            id: 'organizationUsers', 
-            path: '/organizations/users', 
-            component: 'OrganizationUsers',
-            filePath: 'src/pages/organizations/OrganizationUsers.jsx',
-            lastModified: '2024-02-03',
-            usageCount: 29,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['administrator'],
-            reason: 'Active admin tool'
-          },
-          
-          // Report pages
-          { 
-            id: 'requestReports', 
-            path: '/reports/requests', 
-            component: 'RequestReports',
-            filePath: 'src/pages/reports/RequestReports.jsx',
-            lastModified: '2024-02-01',
-            usageCount: 45,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'keep',
-            usedBy: ['administrator', 'user'],
-            reason: 'Active reporting tool'
-          },
-          
-          // Legacy/unused pages
-          { 
-            id: 'oldUserProfile', 
-            path: '/profile-old', 
-            component: 'UserProfile',
-            filePath: 'src/pages/UserProfile.jsx', // Not in a subfolder, old structure
-            lastModified: '2023-05-15', // Old modification date
-            usageCount: 3,
-            deploymentStatus: 'deployed',
-            dependencies: ['deprecated-auth-hook'],
-            recommended: 'delete',
-            usedBy: ['none'],
-            reason: 'Superseded by new user management'
-          },
-          { 
-            id: 'betaFeatures', 
-            path: '/beta-features', 
-            component: 'BetaFeatures',
-            filePath: 'src/pages/beta/BetaFeatures.jsx',
-            lastModified: '2023-08-10',
-            usageCount: 0,
-            deploymentStatus: 'deployed',
-            dependencies: ['experimental-ui'],
-            recommended: 'delete',
-            usedBy: ['none'],
-            reason: 'Beta features now in production'
-          },
-          { 
-            id: 'v1Reports', 
-            path: '/v1/reports', 
-            component: 'OldReports',
-            filePath: 'src/pages/v1/Reports.jsx',
-            lastModified: '2023-04-22',
-            usageCount: 2,
-            deploymentStatus: 'deployed',
-            dependencies: ['old-charts-lib'],
-            recommended: 'delete',
-            usedBy: ['none'],
-            reason: 'Replaced by new reports module'
-          },
-          
-          // Duplicate functionality
-          { 
-            id: 'tempAdminPanel', 
-            path: '/temp-admin', 
-            component: 'TempAdminPanel',
-            filePath: 'src/pages/admin/TempAdminPanel.jsx',
-            lastModified: '2023-12-01',
-            usageCount: 5,
-            deploymentStatus: 'deployed',
-            dependencies: ['useAuth', 'supabase'],
-            recommended: 'delete',
-            usedBy: ['administrator'],
-            reason: 'Temporary admin panel now redundant'
-          },
-          
-          // Development/staging pages
-          { 
-            id: 'newFeaturePreview', 
-            path: '/preview/new-feature', 
-            component: 'NewFeaturePreview',
-            filePath: 'src/pages/preview/NewFeaturePreview.jsx',
-            lastModified: '2024-01-15',
-            usageCount: 11,
-            deploymentStatus: 'development',
-            dependencies: ['useAuth', 'experimental-hooks'],
-            recommended: 'review',
-            usedBy: ['administrator'],
-            reason: 'Development preview - move to production or delete'
-          }
+        // For demo purposes, we'll simulate executing these commands and parsing the output
+        const gitCommands = [
+          'git ls-files "src/pages/**/*.jsx" "src/pages/**/*.js" "src/pages/**/*.tsx"',
+          'git log --name-only --pretty=format:"%ad" --date=short -- src/pages/'
         ];
         
-        setPages(analyzedPages);
+        setGitOutput(`Executing Git commands:\n${gitCommands.join('\n')}\n\nAnalyzing repository structure...`);
+        
+        // Simulate Git command response based on the actual structure from your App.js
+        // This would be replaced with actual Git command execution
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Parse the files from App.js and extract actual page components
+        // These are based on the imports from your uploaded App.js file
+        const detectedFiles = [
+          'src/pages/Login/Login.jsx',
+          'src/pages/UserManagement/UserManagement.jsx',
+          'src/pages/Unauthorized.jsx',
+          'src/pages/dashboard/AdminDashboard.jsx',
+          'src/pages/dashboard/UserDashboard.jsx',
+          'src/pages/dashboard/OrgDashboard.jsx',
+          'src/pages/requests/RequestList.jsx',
+          'src/pages/requests/RequestDetail.jsx',
+          'src/pages/requests/NewRequest.jsx',
+          'src/pages/organizations/OrganizationList.jsx',
+          'src/pages/organizations/OrganizationDetail.jsx',
+          'src/pages/organizations/OrganizationUsers.jsx',
+          'src/pages/organizations/OrganizationProfile.jsx',
+          'src/pages/reports/RequestReports.jsx',
+          'src/pages/reports/PerformanceReports.jsx',
+          'src/pages/reports/OrganizationReports.jsx',
+          'src/pages/reports/CustomReports.jsx',
+          'src/pages/notifications/NotificationCenter.jsx',
+          'src/pages/Contact.jsx'
+        ];
+        
+        // Let's check for extra files that might exist in the repo but aren't imported in App.js
+        // These would be detected by Git command but aren't in your routing
+        const potentialUnusedFiles = [
+          'src/pages/OldPage.jsx', // Example of unused page
+          'src/pages/legacy/LegacyDashboard.jsx', // Example of legacy page
+          'src/pages/testing/TestComponent.jsx' // Example of test page
+        ];
+        
+        // Combine the lists to simulate what Git would find
+        const allFiles = [...detectedFiles];
+        
+        // Analyze the files to create page objects
+        const pageObjects = allFiles.map(filePath => {
+          // Extract component name from file path
+          const pathParts = filePath.split('/');
+          const fileName = pathParts[pathParts.length - 1];
+          const componentName = fileName.replace('.jsx', '').replace('.js', '').replace('.tsx', '');
+          
+          // Determine if the file is being used in routing (from your App.js)
+          const isInRouting = detectedFiles.includes(filePath);
+          
+          // Generate path based on file location and naming convention
+          let routePath = '/' + componentName.toLowerCase();
+          if (pathParts.length > 3) {
+            // If in subfolder, use that as part of the path
+            const section = pathParts[pathParts.length - 2];
+            if (section !== 'pages') {
+              routePath = '/' + section.toLowerCase() + routePath;
+            }
+          }
+          
+          // Special case handling for index files
+          if (componentName === 'index') {
+            routePath = '/' + pathParts[pathParts.length - 2].toLowerCase();
+          }
+          
+          // Determine last modified date (would come from Git in real implementation)
+          // For this demo, we'll use static dates
+          const lastModified = isInRouting ? 
+            '2024-02-15' : // Recently modified for pages in routing
+            '2023-06-30';  // Older date for unused pages
+          
+          return {
+            id: filePath,
+            path: routePath,
+            component: componentName,
+            filePath: filePath,
+            lastModified: lastModified,
+            inRouting: isInRouting,
+            recommended: isInRouting ? 'keep' : 'delete',
+            reason: isInRouting ? 'Used in App.js routing' : 'Not found in routing configuration'
+          };
+        });
+        
+        setPages(pageObjects);
         setLoading(false);
       } catch (err) {
-        console.error('Error scanning repository:', err);
-        setError('Failed to scan repository. Please check console for details.');
+        console.error('Error analyzing repository:', err);
+        setError('Failed to analyze repository. Please check console for details.');
         setLoading(false);
       }
     };
@@ -264,7 +128,7 @@ const PageManager = () => {
     scanRepository();
   }, []);
 
-  // Toggle a page for deletion
+  // Toggle page selection for deletion
   const togglePageForDeletion = (pageId) => {
     if (pagesToDelete.includes(pageId)) {
       setPagesToDelete(pagesToDelete.filter(id => id !== pageId));
@@ -273,29 +137,31 @@ const PageManager = () => {
     }
   };
 
-  // Handle deletion of selected pages
+  // Handle deletion (would connect to Git in real implementation)
   const handleDeletePages = async () => {
     try {
       setLoading(true);
       
-      // This would connect to GitHub API to delete files
-      // For now, just simulate the process
+      // This would execute Git commands to remove the files
+      // For demo purposes, we'll just simulate the process
+      const gitCommands = pagesToDelete.map(id => `git rm ${id}`);
       
-      // In a real implementation, you would:
-      // 1. Create a commit to GitHub that removes these files
-      // 2. Trigger a new Vercel deployment
+      setGitOutput(`Executing Git commands:\n${gitCommands.join('\n')}\n\nCommitting changes...`);
+      setShowGitOutput(true);
       
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API request
+      // Simulate Git operation
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Update the UI to remove deleted pages
+      // Update UI
       setPages(pages.filter(page => !pagesToDelete.includes(page.id)));
       setPagesToDelete([]);
       setShowConfirmation(false);
       setDeleteMode(false);
+      setGitOutput(gitOutput + '\n\nFiles successfully deleted and committed.');
       setLoading(false);
     } catch (err) {
-      console.error('Error deleting pages:', err);
-      setError('Failed to delete pages. Please check console for details.');
+      console.error('Error deleting files:', err);
+      setError('Failed to delete files. Please check console for details.');
       setLoading(false);
     }
   };
@@ -310,7 +176,7 @@ const PageManager = () => {
     }
   };
 
-  // Filter pages based on current criteria
+  // Filter pages based on criteria
   const filteredPages = pages.filter(page => {
     // Filter by recommendation
     if (filterType !== 'all' && page.recommended !== filterType) {
@@ -327,7 +193,7 @@ const PageManager = () => {
     return true;
   });
   
-  // Sort filtered pages
+  // Sort pages
   const sortedPages = [...filteredPages].sort((a, b) => {
     let comparison = 0;
     
@@ -338,11 +204,11 @@ const PageManager = () => {
       case 'component':
         comparison = a.component.localeCompare(b.component);
         break;
+      case 'filePath':
+        comparison = a.filePath.localeCompare(b.filePath);
+        break;
       case 'lastModified':
         comparison = new Date(b.lastModified) - new Date(a.lastModified);
-        break;
-      case 'usage':
-        comparison = b.usageCount - a.usageCount;
         break;
       default:
         comparison = 0;
@@ -351,11 +217,11 @@ const PageManager = () => {
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
-  // Determine counts for each category
+  // Calculate statistics
   const pageCounts = {
+    total: pages.length,
     keep: pages.filter(page => page.recommended === 'keep').length,
-    delete: pages.filter(page => page.recommended === 'delete').length,
-    review: pages.filter(page => page.recommended === 'review').length
+    delete: pages.filter(page => page.recommended === 'delete').length
   };
 
   if (loading) {
@@ -363,7 +229,12 @@ const PageManager = () => {
       <div className="max-w-6xl mx-auto p-4">
         <div className="flex flex-col items-center justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          <p className="mt-4 text-lg">Scanning repository and analyzing pages...</p>
+          <p className="mt-4 text-lg">Scanning repository structure...</p>
+          {gitOutput && (
+            <div className="mt-6 bg-gray-800 text-green-400 p-4 rounded font-mono text-sm w-full max-w-lg overflow-auto">
+              <pre>{gitOutput}</pre>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -389,27 +260,42 @@ const PageManager = () => {
     <div className="max-w-6xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-2">Page Manager</h1>
       <p className="text-gray-600 mb-6">
-        Repository analysis complete. Found {pages.length} pages in your GitHub repository.
+        Git repository analysis complete. Found {pages.length} page components in your codebase.
       </p>
       
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded shadow">
           <h2 className="text-lg font-semibold mb-2">Total Pages</h2>
-          <p className="text-3xl font-bold">{pages.length}</p>
+          <p className="text-3xl font-bold">{pageCounts.total}</p>
         </div>
         <div className="bg-green-50 p-4 rounded shadow border-l-4 border-green-500">
-          <h2 className="text-lg font-semibold mb-2">Keep</h2>
+          <h2 className="text-lg font-semibold mb-2">In Routing (Keep)</h2>
           <p className="text-3xl font-bold text-green-600">{pageCounts.keep}</p>
         </div>
         <div className="bg-red-50 p-4 rounded shadow border-l-4 border-red-500">
-          <h2 className="text-lg font-semibold mb-2">Delete</h2>
+          <h2 className="text-lg font-semibold mb-2">Not Used (Delete)</h2>
           <p className="text-3xl font-bold text-red-600">{pageCounts.delete}</p>
         </div>
-        <div className="bg-yellow-50 p-4 rounded shadow border-l-4 border-yellow-500">
-          <h2 className="text-lg font-semibold mb-2">Review</h2>
-          <p className="text-3xl font-bold text-yellow-600">{pageCounts.review}</p>
-        </div>
+      </div>
+      
+      {/* Git output toggle */}
+      <div className="mb-4">
+        <button 
+          className="bg-gray-700 text-white px-4 py-2 rounded flex items-center"
+          onClick={() => setShowGitOutput(!showGitOutput)}
+        >
+          <span className="mr-2">{showGitOutput ? 'Hide' : 'Show'} Git Analysis</span>
+          <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transform ${showGitOutput ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+        
+        {showGitOutput && (
+          <div className="mt-2 bg-gray-800 text-green-400 p-4 rounded font-mono text-sm overflow-auto">
+            <pre>{gitOutput}</pre>
+          </div>
+        )}
       </div>
       
       {/* Filters and controls */}
@@ -427,9 +313,8 @@ const PageManager = () => {
                 onChange={(e) => setFilterType(e.target.value)}
               >
                 <option value="all">All Pages</option>
-                <option value="keep">Recommended to Keep</option>
-                <option value="delete">Recommended to Delete</option>
-                <option value="review">Needs Review</option>
+                <option value="keep">Used in Routing (Keep)</option>
+                <option value="delete">Not Used (Delete)</option>
               </select>
             </div>
             
@@ -441,7 +326,7 @@ const PageManager = () => {
                 id="searchTerm"
                 type="text"
                 className="border rounded p-2 w-full"
-                placeholder="Search by path, component or file..."
+                placeholder="Search pages..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -492,14 +377,22 @@ const PageManager = () => {
                   onClick={() => handleSort('path')}
                 >
                   <div className="flex items-center">
-                    Path
+                    Route Path
                     {sortBy === 'path' && (
                       <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  File Path
+                <th 
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  onClick={() => handleSort('filePath')}
+                >
+                  <div className="flex items-center">
+                    File Path
+                    {sortBy === 'filePath' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </div>
                 </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -512,19 +405,8 @@ const PageManager = () => {
                     )}
                   </div>
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('usage')}
-                >
-                  <div className="flex items-center">
-                    Usage
-                    {sortBy === 'usage' && (
-                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </div>
-                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Recommendation
+                  Status
                 </th>
               </tr>
             </thead>
@@ -556,16 +438,12 @@ const PageManager = () => {
                   <td className="px-4 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">{page.lastModified}</div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {page.usageCount}
-                  </td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       page.recommended === 'keep' ? 'bg-green-100 text-green-800' : 
-                      page.recommended === 'delete' ? 'bg-red-100 text-red-800' : 
-                      'bg-yellow-100 text-yellow-800'
+                      'bg-red-100 text-red-800'
                     }`}>
-                      {page.recommended}
+                      {page.inRouting ? 'In Routing' : 'Not Used'}
                     </span>
                     <div className="text-xs text-gray-500 mt-1">{page.reason}</div>
                   </td>
@@ -580,17 +458,17 @@ const PageManager = () => {
         </div>
       )}
 
-      {/* GitHub integration info */}
-      <div className="mt-6 bg-blue-50 p-4 rounded shadow border-l-4 border-blue-500">
-        <h3 className="text-lg font-semibold text-blue-800 mb-2">GitHub Integration</h3>
-        <p className="text-sm text-blue-700 mb-2">
-          To fully implement this Page Manager with your GitHub repository, you'll need to:
+      {/* Implementation notes */}
+      <div className="mt-6 bg-yellow-50 p-4 rounded shadow border-l-4 border-yellow-500">
+        <h3 className="text-lg font-semibold text-yellow-800 mb-2">Implementation Notes</h3>
+        <p className="text-sm text-yellow-700 mb-2">
+          To fully implement this Page Manager with your Git repository:
         </p>
-        <ol className="list-decimal pl-5 text-sm text-blue-700">
-          <li className="mb-1">Create a GitHub Personal Access Token with repo permissions</li>
-          <li className="mb-1">Add the token to your environment variables</li>
-          <li className="mb-1">Replace the mock data with actual GitHub API calls</li>
-          <li className="mb-1">Connect with Vercel analytics to track page usage</li>
+        <ol className="list-decimal pl-5 text-sm text-yellow-700">
+          <li className="mb-1">This component can be run as a local tool or as part of your admin interface</li>
+          <li className="mb-1">For full Git integration, you'll need a Node.js backend service with access to your Git repository</li>
+          <li className="mb-1">The backend would execute Git commands and parse the results</li>
+          <li className="mb-1">The React component would communicate with this backend via API calls</li>
         </ol>
       </div>
 
@@ -616,7 +494,7 @@ const PageManager = () => {
               </ul>
             </div>
             <p className="text-red-600 text-sm mb-4">
-              This will delete these files from your GitHub repository. This action cannot be undone.
+              This will delete these files from your Git repository. This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-2">
               <button

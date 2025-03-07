@@ -305,11 +305,9 @@ const RequestList = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Document Requests
+              
             </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Manage and track document requests
-            </p>
+
           </div>
           
           <div className="flex gap-2">
@@ -359,7 +357,7 @@ const RequestList = () => {
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Search input */}
             <div className="relative flex-grow">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by reference, subject, or sender..."

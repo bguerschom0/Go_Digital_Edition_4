@@ -335,11 +335,11 @@ const PerformanceReports = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
-        {getReportTitle()}
+        Performance Report
       </h1>
 
+      <div className="flex space-x-3">
                 {/* Export Button */}
-          <div className="flex justify-end mt-6">
             <ReportExport 
               onExport={handleExport} 
               data={{

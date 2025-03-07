@@ -489,9 +489,6 @@ const handleExport = async () => {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Request Reports
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Insights and statistics about document requests
-          </p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -509,8 +506,8 @@ const handleExport = async () => {
           <button
             onClick={handleExport}
             disabled={loading || refreshing || totalRequests === 0}
-            className="flex items-center px-3 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg
-                     hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg
+                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <Download className="w-4 h-4 mr-2" />
             Export Report

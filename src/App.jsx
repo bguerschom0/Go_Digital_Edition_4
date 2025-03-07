@@ -39,9 +39,6 @@ import NotificationCenter from './pages/notifications/NotificationCenter';
 // Contact Page
 import Contact from './pages/Contact';
 
-// page Manager
-import PageManager from'./pages/Admin/PageManager';
-
 const ProtectedRoute = ({ children, requiredRoles = [] }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -112,8 +109,6 @@ const App = () => {
       {/* Contact route */}
       <Route path="/contact" element={<ProtectedRoute requiredRoles={['administrator','organization']}><AuthenticatedLayout><Contact /></AuthenticatedLayout></ProtectedRoute>} />
 
-      {/* Page Manager - Admin only route */}
-      <Route path="/page-manager" element={  <ProtectedRoute requiredRoles={['administrator']}>    <AuthenticatedLayout>      <PageManager />    </AuthenticatedLayout>  </ProtectedRoute>} />
       
 
       {/* Root route redirect */}

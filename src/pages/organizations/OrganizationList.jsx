@@ -7,8 +7,10 @@ import {
   Edit, 
   Trash, 
   Users,
-  Loader2
+  Loader2,
+  Download // Added Download icon
 } from 'lucide-react';
+import * as XLSX from 'xlsx'; // Import xlsx library for Excel export
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ModalOrganizationUsers from '../../components/modals/ModalOrganizationUsers';
@@ -90,6 +92,40 @@ const OrganizationList = () => {
     fetchOrganizations();
   };
 
+  // Export organizations to Excel
+  const exportToExcel = () => {
+    // Prepare data for export - clean up the data
+    const exportData = organizations.map(org => ({
+      'Organization Name': org.name,
+      'Email': org.email || '',
+      'Phone': org.phone || '',
+      'Number of Users': org.userCount,
+      'Created At': org.created_at ? new Date(org.created_at).toLocaleString() : ''
+    }));
+    
+    // Create workbook and worksheet
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    
+    // Set column widths for better readability
+    const columnWidths = [
+      { wch: 30 }, // Organization Name
+      { wch: 25 }, // Email
+      { wch: 15 }, // Phone
+      { wch: 15 }, // Number of Users
+      { wch: 20 }  // Created At
+    ];
+    worksheet['!cols'] = columnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Organizations');
+    
+    // Generate file name with current date
+    const fileName = `Organizations_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    // Export the file
+    XLSX.writeFile(workbook, fileName);
+  };
+
   const filteredOrganizations = organizations.filter(org => 
     org.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -118,14 +154,28 @@ const OrganizationList = () => {
             </h1>
           </div>
 
-          <button
-            onClick={() => openDetailModal('new')}
-            className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black
+          <div className="flex space-x-3">
+            {/* Export to Excel button */}
+            <button
+              onClick={exportToExcel}
+              className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black
                      rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Organization
-          </button>
+              disabled={loading || organizations.length === 0}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Excel
+            </button>
+
+            {/* Add organization button */}
+            <button
+              onClick={() => openDetailModal('new')}
+              className="flex items-center px-4 py-2 bg-black text-white dark:bg-white dark:text-black
+                     rounded-lg transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Organization
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}

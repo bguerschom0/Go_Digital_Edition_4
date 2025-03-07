@@ -394,7 +394,7 @@ const ModalOrganizationDetail = ({ isOpen, onClose, organizationId, onSuccess })
               Cancel
             </button>
 
-            <div className="pl-6">
+            <div className="pl-3">
             <button
               type="submit"
               disabled={saving}

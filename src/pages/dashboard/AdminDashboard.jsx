@@ -1,21 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
-} from 'recharts';
-import { 
-  Users, 
-  UserCheck, 
-  FileText, 
-  Building, 
-  Clock,
-  CheckSquare,
-  AlertTriangle,
-  ArrowRight,
-  BarChart as BarChartIcon
-} from 'lucide-react';
+import {  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell} from 'recharts';
+import {  Users, UserCheck, FileText, Building, Clock, CheckSquare, ArrowRight, BarChart as BarChartIcon} from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../config/supabase';
 import { StatCard } from '../../components/common/StatCard';
@@ -81,7 +68,7 @@ const AdminDashboard = () => {
 
       // Process role distribution data
       const roleCounts = roleData.reduce((acc, user) => {
-        const role = user.user_role_v4 || 'user'; // Default to user if not set
+        const role = user.user_role_v4 || 'user';
         acc[role] = (acc[role] || 0) + 1;
         return acc;
       }, {});
@@ -467,49 +454,6 @@ const AdminDashboard = () => {
               )}
             </motion.div>
 
-            {/* Quick Links Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
-            >
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Quick Actions
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Link
-                  to="/requests"
-                  className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <FileText className="h-6 w-6 text-blue-500 mr-3" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Manage Requests</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">View and process document requests</p>
-                  </div>
-                </Link>
-                <Link
-                  to="/user-management"
-                  className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <Users className="h-6 w-6 text-purple-500 mr-3" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">User Management</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Manage users and access</p>
-                  </div>
-                </Link>
-                <Link
-                  to="/request-analytics"
-                  className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <BarChartIcon className="h-6 w-6 text-green-500 mr-3" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Analytics</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">View reports and insights</p>
-                  </div>
-                </Link>
-              </div>
-            </motion.div>
           </div>
         )}
       </div>

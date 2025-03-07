@@ -25,6 +25,7 @@ import NewRequest from './pages/requests/NewRequest';
 import OrganizationList from './pages/organizations/OrganizationList';
 import OrganizationDetail from './pages/organizations/OrganizationDetail';
 import OrganizationUsers from './pages/organizations/OrganizationUsers';
+import OrganizationProfile from './pages/organizations/OrganizationProfile';
 
 // Report Pages
 import RequestReports from './pages/reports/RequestReports';
@@ -34,6 +35,9 @@ import CustomReports from './pages/reports/CustomReports';
 
 // Notification Page
 import NotificationCenter from './pages/notifications/NotificationCenter';
+
+// Contact Page
+import Contact from './pages/Contact';
 
 const ProtectedRoute = ({ children, requiredRoles = [] }) => {
   const { user, loading } = useAuth();
@@ -91,6 +95,7 @@ const App = () => {
       <Route path="/organizations" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationList /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/organizations/users" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationUsers /></AuthenticatedLayout></ProtectedRoute>} />
       <Route path="/organizations/:id" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationDetail /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/organization-profile" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><OrganizationProfile /></AuthenticatedLayout></ProtectedRoute>} />
       
       {/* Report routes - only for administrators */}
       <Route path="/reports/requests" element={<ProtectedRoute requiredRoles={['administrator', 'user']}><AuthenticatedLayout><RequestReports /></AuthenticatedLayout></ProtectedRoute>} />
@@ -99,7 +104,11 @@ const App = () => {
       <Route path="/reports/custom" element={<ProtectedRoute requiredRoles={['administrator']}><AuthenticatedLayout><CustomReports /></AuthenticatedLayout></ProtectedRoute>} />
       
       {/* Notification route */}
-      <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout><NotificationCenter /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute requiredRoles={['administrator','organization']}><AuthenticatedLayout><NotificationCenter /></AuthenticatedLayout></ProtectedRoute>} />
+
+      {/* Contact route */}
+      <Route path="/contact" element={<ProtectedRoute requiredRoles={['administrator','organization']}><AuthenticatedLayout><Contact /></AuthenticatedLayout></ProtectedRoute>} />
+      
 
       {/* Root route redirect */}
       <Route path="/" element={<Navigate to={user ? getRoleBasedDashboard(user.role) : "/login"} replace />} />
